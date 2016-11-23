@@ -80,6 +80,11 @@ function getMenuTemplate(options) {
           role: 'paste'
         },
         {
+          label: 'Duplicate',
+          accelerator: 'CmdOrCtrl+D',
+          role: 'duplicate'
+        },
+        {
           label: 'Select All',
           accelerator: 'CmdOrCtrl+A',
           role: 'selectall'

@@ -8,7 +8,7 @@ const _ = require('lodash');
 function getMenuTemplate(options) {
   var template = [
     {
-      label: 'File',
+      label:  'File',
       submenu: [
         {
           label: 'New',
@@ -222,7 +222,7 @@ var globalOptions = {};
 function setMenu(options) {
   globalOptions = _.extend(globalOptions, options); //overwrite with later args
   var template = getMenuTemplate(globalOptions);
-  var menu = Menu.buildFromTemplate(template);
+  var menu = Menu.buildFromTemplate(options.processMenu(template));
   Menu.setApplicationMenu(menu);
 }
 

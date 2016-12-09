@@ -9,16 +9,19 @@ function getMenuTemplate(options) {
   var template = [
     {
       label:  'File',
+	  id: "file",
       submenu: [
         {
           label: 'New',
           accelerator: 'CmdOrCtrl+N',
-          click: options.newMethod
+          click: options.newMethod,
+		  id: 'new'
         },
         {
           label: 'Open',
           accelerator: 'CmdOrCtrl+O',
-          click: options.openMethod
+          click: options.openMethod,
+		  id: 'open'
         },
         {
           type: 'separator'
@@ -27,39 +30,46 @@ function getMenuTemplate(options) {
           label: 'Save',
           accelerator: 'CmdOrCtrl+S',
           enabled: options.isFocusedWindow,
-          click: options.saveMethod
+          click: options.saveMethod,
+		  id: 'save'
         },
         {
           label: 'Save As',
           accelerator: 'CmdOrCtrl+Shift+S',
           enabled: options.isFocusedWindow,
-          click: options.saveAsMethod
+          click: options.saveAsMethod,
+		  id: 'save_as'
         },
         {
           label: 'Rename',
           enabled: options.isFocusedWindow, //FIX
-          click: options.renameMethod
+          click: options.renameMethod,
+		  id: 'rename'
         },
         {
           label: 'Close',
           accelerator: 'CmdOrCtrl+W',
           enabled: options.isFocusedWindow,
-          click: options.closeMethod
+          click: options.closeMethod,
+		  id: 'close'
         }
       ]
     },
     {
       label: 'Edit',
+	  id: 'edit',
       submenu: [
         {
           label: 'Undo',
           accelerator: 'CmdOrCtrl+Z',
-          role: 'undo'
+          role: 'undo',
+		  id: 'undo'
         },
         {
           label: 'Redo',
           accelerator: 'Shift+CmdOrCtrl+Z',
-          role: 'redo'
+          role: 'redo',
+		  id: 'redo'
         },
         {
           type: 'separator'
@@ -67,35 +77,42 @@ function getMenuTemplate(options) {
         {
           label: 'Cut',
           accelerator: 'CmdOrCtrl+X',
-          role: 'cut'
+          role: 'cut',
+		  id: 'cut'
         },
         {
           label: 'Copy',
           accelerator: 'CmdOrCtrl+C',
-          role: 'copy'
+          role: 'copy',
+		  id: 'copy'
         },
         {
           label: 'Paste',
           accelerator: 'CmdOrCtrl+V',
-          role: 'paste'
+          role: 'paste',
+		  id: 'paste'
         },
         {
           label: 'Duplicate',
           accelerator: 'CmdOrCtrl+D',
-          role: 'duplicate'
+          role: 'duplicate',
+		  id: 'duplicate'
         },
         {
           label: 'Select All',
           accelerator: 'CmdOrCtrl+A',
-          role: 'selectall'
+          role: 'selectall',
+		  id: 'selectall'
         },
       ]
     },
     {
       label: 'View',
+	  id: 'view',
       submenu: [
         {
           label: 'Reload',
+	      id: 'reload',
           accelerator: 'CmdOrCtrl+R',
           click: function(item, focusedWindow) {
             if (focusedWindow) {
@@ -105,6 +122,7 @@ function getMenuTemplate(options) {
         },
         {
           label: 'Toggle Full Screen',
+	   	  id: 'fullscreen',
           accelerator: (function() {
             if (process.platform == 'darwin')
               return 'Ctrl+Command+F';
@@ -118,6 +136,7 @@ function getMenuTemplate(options) {
         },
         {
           label: 'Toggle Developer Tools',
+	      id: 'developer_tools',
           accelerator: (function() {
             if (process.platform == 'darwin')
               return 'Alt+Command+I';
@@ -135,17 +154,20 @@ function getMenuTemplate(options) {
     {
       label: 'Window',
       role: 'window',
+	  id: 'window',
       submenu: [
         {
           label: 'Minimize',
           accelerator: 'CmdOrCtrl+M',
-          role: 'minimize'
+          role: 'minimize',
+		  id: 'minimize'
         }
       ]
     },
     {
       label: 'Help',
       role: 'help',
+	  id: 'help',
       submenu: [
         {
           label: 'Learn More',
@@ -162,7 +184,8 @@ function getMenuTemplate(options) {
       submenu: [
         {
           label: 'About ' + name,
-          role: 'about'
+          role: 'about',
+		  id: 'about'
         },
         {
           type: 'separator'
@@ -170,6 +193,7 @@ function getMenuTemplate(options) {
         {
           label: 'Services',
           role: 'services',
+		  id: 'services',
           submenu: []
         },
         {
@@ -178,16 +202,19 @@ function getMenuTemplate(options) {
         {
           label: 'Hide ' + name,
           accelerator: 'Command+H',
-          role: 'hide'
+          role: 'hide',
+		  id: 'hide'
         },
         {
           label: 'Hide Others',
           accelerator: 'Command+Shift+H',
-          role: 'hideothers'
+          role: 'hideothers',
+		  id: 'hideothers'
         },
         {
           label: 'Show All',
-          role: 'unhide'
+          role: 'unhide',
+		  id: 'unhide'
         },
         {
           type: 'separator'
@@ -195,7 +222,8 @@ function getMenuTemplate(options) {
         {
           label: 'Quit',
           accelerator: 'Command+Q',
-          click: function() { app.quit(); }
+          click: function() { app.quit() },
+	      id: 'quit'
         },
       ]
     });
@@ -207,7 +235,8 @@ function getMenuTemplate(options) {
       },
       {
         label: 'Bring All to Front',
-        role: 'front'
+        role: 'front',
+	    id: 'front'
       }
     );
 

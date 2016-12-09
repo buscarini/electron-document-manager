@@ -222,6 +222,11 @@ var globalOptions = {};
 function setMenu(options) {
   globalOptions = _.extend(globalOptions, options); //overwrite with later args
   var template = getMenuTemplate(globalOptions);
+
+  if (options.processMenu == undefined) {
+	  options.processMenu = item => { item }
+  }
+  
   var menu = Menu.buildFromTemplate(options.processMenu(template));
   Menu.setApplicationMenu(menu);
 }

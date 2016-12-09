@@ -219,22 +219,25 @@ function getMenuTemplate(options) {
 //options saved from last time - so that you can just change a few
 var globalOptions = {};
 
+let id = a => { return a }
+
 function setMenu(options) {
   globalOptions = _.extend(globalOptions, options); //overwrite with later args
   var template = getMenuTemplate(globalOptions);
 
-  if (options.processMenu == undefined) {
-	  options.processMenu = item => { item }
-  }
-  
-  var menu = Menu.buildFromTemplate(options.processMenu(template));
+  let processMenu = (options.processMenu === undefined || options.processMenu === null) ? id : options.processMenu
+
+  var menu = Menu.buildFromTemplate(processMenu(template));
   Menu.setApplicationMenu(menu);
 }
 
-function updateMenu() {
+function updateMenu(processMenu) {
+	  let process = (processMenu === undefined || processMenu === null) ? id : processMenu
+	
   setImmediate(function() { // electron bug - focused window is still defined on tick of blur event
     setMenu({               // see https://github.com/atom/electron/issues/984
-      isFocusedWindow: !!BrowserWindow.getFocusedWindow()
+      isFocusedWindow: !!BrowserWindow.getFocusedWindow(),
+		processMenu: process
     });
   });
 }

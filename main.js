@@ -10,13 +10,9 @@ const fileManager = require('./fileManager');
 const windowManager = require('./windowManager');
 const ipcHelper = require('./ipcHelper');
 
-let id = a => a
-
 var initialize = function(options) {
 
   windowManager.initializeWithEntryPoint(options.entryPoint);
-
-  let processMenu = options.processMenu ? options.processMenu : id
 
   // Quit when all windows are closed.
   app.on('window-all-closed', function() {
@@ -25,7 +21,7 @@ var initialize = function(options) {
     if (process.platform != 'darwin') {
       app.quit();
     } else {
-      menuManager.updateMenu();
+      menuManager.updateMenu(options.processMenu);
     }
   });
 
@@ -96,11 +92,11 @@ var initialize = function(options) {
       closeMethod: function(item, focusedWindow) {
         fileManager.closeFile();
       },
-	  processMenu: processMenu
+	  processMenu: options.processMenu
     });
 
     //set up window menu updates - to be run on focus, blur, and window create
-    windowManager.setFocusUpdateHandler(menuManager.updateMenu);
+    windowManager.setFocusUpdateHandler(() => menuManager.updateMenu(options.processMenu) );
 
     //create first window
     windowManager.createWindow();

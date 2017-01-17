@@ -9,10 +9,18 @@
   "keywords": [
     "electron"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/buscarini/electron-document-manager.git"
+  },
   "author": "Jackson de Campos <jackson@jacksondc.com> (http://jacksondc.com)",
   "license": "MIT",
   "dependencies": {
     "async": "^1.5.2",
+    "data.task": "^3.1.1",
+    "electron-settings": "^2.2.2",
+    "immutable": "^3.8.1",
+    "immutable-ext": "^1.0.8",
     "lodash": "^4.0.0"
   }
 }

@@ -9,6 +9,61 @@ const menuManager = require('./menuManager');
 const fileManager = require('./fileManager');
 const windowManager = require('./windowManager');
 const ipcHelper = require('./ipcHelper');
+const settings = require('electron-settings');
+
+const { List, Map } = require('immutable-ext')
+const Task = require('data.task')
+
+let recentFilesKey = "document_recentFiles"
+
+let winPath = win => {
+	return new Task(function(reject, resolve) {
+        ipcHelper.requestFromRenderer(win, 'filepath', function(event, winFilepath) {
+			resolve(winFilepath)
+		}		
+	})
+}
+
+let saveWindows = windowManager => {
+	var windows = windowManager.getWindows()
+	
+	List(windows)
+		.traverse(winPath)
+		.fork(console.error, pathsList => {
+			settings.set(recentFilesKey, pathsList.toJS())
+		})
+}
+
+let loadRecentDocs = () => {
+	let recents = settings.getSync(recentFilesKey)
+	return _.defaultTo(recents, [])
+}
+
+let loadWindows = windowManager => {
+	let recents = loadRecentDocs()
+	_.map(recents, docPath => createDocWindow(docPath, windowManager, ""))
+	
+	windowManager.createWindow()
+}
+
+let createDocWindow = (path, windowManager, currentFileContent) => {
+    //not open, do the rest of the stuff
+
+    //check if should open in current window or new
+    var isEdited = fileManager.fileIsEdited(path, currentFileContent)
+
+    if(BrowserWindow.getFocusedWindow() && !isEdited && currentFileContent === "") {
+      //open in current window
+      windowManager.setUpWindow(BrowserWindow.getFocusedWindow(), filepath, openFileContent)
+    } else {
+      //open in different window
+      windowManager.createWindow({
+        focusedWindow: focusedWindow,
+        fileContent: openFileContent,
+        filepath: path
+      })
+    }
+}
 
 var initialize = function(options) {
 
@@ -19,6 +74,7 @@ var initialize = function(options) {
     // On OS X it is common for applications and their menu bar
     // to stay active until the user quits explicitly with Cmd + Q
     if (process.platform != 'darwin') {
+	  saveWindows(windowManager)
       app.quit();
     } else {
       menuManager.updateMenu(options.processMenu);
@@ -27,6 +83,7 @@ var initialize = function(options) {
 
   app.on('open-file', function(e, path) {
     app.addRecentDocument(path);
+	saveWindows(windowManager)
   });
 
   // This method will be called when Electron has finished
@@ -59,38 +116,26 @@ var initialize = function(options) {
           //not sure if ipcHelper response will work with paralle, so doing this in series
           async.series(checkFilepathFuncs, function(err, results) {
             if(!_.includes(results, true)) {
-              //not open, do the rest of the stuff
-
-              //check if should open in current window or new
-              var isEdited = fileManager.fileIsEdited(filepath, currentFileContent);
-
-              if(BrowserWindow.getFocusedWindow() && !isEdited && currentFileContent === "") {
-                //open in current window
-                windowManager.setUpWindow(BrowserWindow.getFocusedWindow(), filepath, openFileContent);
-              } else {
-                //open in different window
-                windowManager.createWindow({
-                  focusedWindow: focusedWindow,
-                  fileContent: openFileContent,
-                  filepath: filepath
-                });
-              }
+              createDocWindow(filepath, windowManager, currentFileContent)
             }
           });
         });
       },
       saveMethod: function(item, focusedWindow) {
-        fileManager.saveFile();
+        fileManager.saveFile()
+		saveWindows(windowManager)
       },
       saveAsMethod: function(item, focusedWindow) {
-        fileManager.saveFileAs();
+        fileManager.saveFileAs()
+		saveWindows(windowManager)
       },
       renameMethod: function(item, focusedWindow) {
         //fileManager.renameFile();
         //to implement later
       },
       closeMethod: function(item, focusedWindow) {
-        fileManager.closeFile();
+        fileManager.closeFile()
+		saveWindows(windowManager)
       },
 	  processMenu: options.processMenu
     });
@@ -98,8 +143,12 @@ var initialize = function(options) {
     //set up window menu updates - to be run on focus, blur, and window create
     windowManager.setFocusUpdateHandler(() => menuManager.updateMenu(options.processMenu) );
 
+
+	// Restore windows
+	loadWindows(windowManager)
+
     //create first window
-    windowManager.createWindow();
+    // windowManager.createWindow();
   });
 }
 

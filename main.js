@@ -11,37 +11,47 @@ const windowManager = require('./windowManager');
 const ipcHelper = require('./ipcHelper');
 const settings = require('electron-settings');
 
+const Immutable = require('immutable')
 const { List, Map } = require('immutable-ext')
 const Task = require('data.task')
+const fs = require("fs")
 
 let recentFilesKey = "document_recentFiles"
 
 let winPath = win => {
 	return new Task(function(reject, resolve) {
         ipcHelper.requestFromRenderer(win, 'filepath', function(event, winFilepath) {
+			console.log("got filepath")
+			console.log(winFilepath)
 			resolve(winFilepath)
-		}		
+		})
 	})
 }
 
 let saveWindows = windowManager => {
+	console.log("save windows")
+	
 	var windows = windowManager.getWindows()
 	
-	List(windows)
-		.traverse(winPath)
+	Immutable.fromJS(windows)
+		.traverse(Task.of, winPath)
 		.fork(console.error, pathsList => {
-			settings.set(recentFilesKey, pathsList.toJS())
+			console.log("perform save windows")
+			console.log(pathsList.toArray())
+			settings.set(recentFilesKey, pathsList.toArray())
 		})
 }
 
 let loadRecentDocs = () => {
-	let recents = settings.getSync(recentFilesKey)
+	let recents = _.filter(settings.getSync(recentFilesKey), x => x !== null)
+	console.log("recents")
+	console.log(recents)
 	return _.defaultTo(recents, [])
 }
 
 let loadWindows = windowManager => {
 	let recents = loadRecentDocs()
-	_.map(recents, docPath => createDocWindow(docPath, windowManager, ""))
+	_.map(recents, docPath => createDocWindow(docPath, windowManager))
 	
 	if (recents.length === 0) {
 		windowManager.createWindow()		
@@ -50,23 +60,28 @@ let loadWindows = windowManager => {
 	return recents
 }
 
-let createDocWindow = (path, windowManager, currentFileContent) => {
+let createDocWindow = (path, windowManager, created) => {
     //not open, do the rest of the stuff
+	let win = BrowserWindow.getFocusedWindow()
+	
+	fs.readFile(path, function(err, openFileContent) {
+	    //check if should open in current window or new
+	    var isEdited = fileManager.fileIsEdited(path, openFileContent)
 
-    //check if should open in current window or new
-    var isEdited = fileManager.fileIsEdited(path, currentFileContent)
-
-    if(BrowserWindow.getFocusedWindow() && !isEdited && currentFileContent === "") {
-      //open in current window
-      windowManager.setUpWindow(BrowserWindow.getFocusedWindow(), filepath, openFileContent)
-    } else {
-      //open in different window
-      windowManager.createWindow({
-        focusedWindow: focusedWindow,
-        fileContent: openFileContent,
-        filepath: path
-      })
-    }
+	    if(win && !isEdited && openFileContent === "") {
+	      //open in current window
+	      windowManager.setUpWindow(win, filepath, openFileContent)
+	    } else {
+	      //open in different window
+	      windowManager.createWindow({
+	        focusedWindow: win,
+	        filepath: path,
+	        fileContent: openFileContent
+	      })
+		  
+		  if (created) created()
+	    }
+	})
 }
 
 var initialize = function(options) {
@@ -120,12 +135,13 @@ var initialize = function(options) {
           //not sure if ipcHelper response will work with paralle, so doing this in series
           async.series(checkFilepathFuncs, function(err, results) {
             if(!_.includes(results, true)) {
-              createDocWindow(filepath, windowManager, currentFileContent)
+            	createDocWindow(filepath, windowManager, () => saveWindows(windowManager))
             }
           });
         });
       },
       saveMethod: function(item, focusedWindow) {
+		  console.log("save File")
         fileManager.saveFile()
 		saveWindows(windowManager)
       },

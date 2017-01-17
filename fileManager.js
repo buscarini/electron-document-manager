@@ -9,8 +9,14 @@ const ipcHelper = require('./ipcHelper');
 
 var fs = require("fs");
 
+const Immutable = require('immutable')
+const { List, Map } = require('immutable-ext')
+const Task = require('data.task')
+
+
 function isEdited(filepath, content) {
-	if(filepath) {
+	console.log(filepath)
+	if(filepath && filepath != 'no-path') {
 		fs.readFile(filepath, function (err, data) {
 			var savedContent = data.toString();
 			if (err) {
@@ -22,22 +28,48 @@ function isEdited(filepath, content) {
 	}
 }
 
+let getParam = (win, param) => {
+	return new Task(function(reject, resolve) {
+		ipcHelper.requestFromRenderer(win, param, function(event, data) {
+			console.log("Retrieved " + param + " value: " + data + " event " + event)
+			resolve(data)
+		})
+	})
+}
+
 // requests filename and content from current browser window
 function getFilepathAndContent(cb) {
-	async.parallel({
-    'content': function(callback) {
-			ipcHelper.requestFromRenderer(BrowserWindow.getFocusedWindow(), 'content', function(event, content) {
-				callback(null, content);
-			});
-    },
-    'filepath': function(callback) {
-			ipcHelper.requestFromRenderer(BrowserWindow.getFocusedWindow(), 'filepath', function(event, filepath) {
-				callback(null, filepath);
-			});
-    }
-	}, function(err, results) {
-		cb(results.filepath, results.content);
-	});
+	
+	ipcHelper.requestFromRenderer(BrowserWindow.getFocusedWindow(), 'filepath_content', function(event, results) {
+		cb(results.filepath, results.content)
+	})
+	
+	// let win = BrowserWindow.getFocusedWindow()
+// 	Immutable.fromJS([ "content", "filepath" ])
+// 		.traverse(Task.of, param => getParam(win, param))
+// 		.fork(console.error, values => {
+// 			console.log("got content and filepath: " + values)
+// 			cb(values.get(0), values.get(1))
+// 			// settings.set(recentFilesKey, pathsList.toJS())
+// 		})
+	
+	// async.parallel({
+	//     'content': function(callback) {
+	// 		ipcHelper.requestFromRenderer(BrowserWindow.getFocusedWindow(), 'content', function(event, content) {
+	// 			console.log("got content")
+	// 			callback(null, content);
+	// 		});
+	//     },
+	//     'filepath': function(callback) {
+	// 		ipcHelper.requestFromRenderer(BrowserWindow.getFocusedWindow(), 'filepath', function(event, filepath) {
+	// 			console.log("got filepath")
+	// 			callback(null, filepath);
+	// 		});
+	//     }
+	// }, function(err, results) {
+	// 	console.log("got content and filepath: " + results)
+	// 	cb(results.filepath, results.content);
+	// });
 }
 
 // OPEN get path to the file-to-open
@@ -91,8 +123,12 @@ function userSaveAsHandler() {
 }
 
 function genericSaveOrSaveAs(type, callback) {
-
+	console.log("save or saveas")
+	
 	getFilepathAndContent(function(filepath, content) {
+		console.log("filepath")
+		console.log(filepath)
+		
 		if (type === 'save-as' || !filepath) {
 			dialog.showSaveDialog(function(filepath) {
 				if(filepath) { //else user cancelled, do nothing
@@ -107,6 +143,7 @@ function genericSaveOrSaveAs(type, callback) {
 				}
 			});
 		} else {
+			console.log(filepath)
 			writeToFile(filepath, content);
 			if(callback) { callback(); }
 		}

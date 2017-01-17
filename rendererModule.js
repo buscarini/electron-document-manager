@@ -19,17 +19,32 @@ ipcRenderer.on('request-content', function(event, callbackChannel) {
 });
 
 ipcRenderer.on('set-filepath', function(event, filepathArg, callbackChannel) {
+	console.log("set filepath " + filepathArg)
 	filepath = filepathArg;
 	if(callbackChannel) ipcRenderer.send(callbackChannel);
 });
 
 ipcRenderer.on('request-filepath', function(event, callbackChannel) {
-	ipcRenderer.send(callbackChannel, filepath);
+	console.log("requesting filepath " + filepath)
+	var path = filepath
+	if (filepath == null) {
+		path = ""
+	}
+	ipcRenderer.send(callbackChannel, path);
 });
+
+ipcRenderer.on('request-filepath_content', function(event, callbackChannel) {
+	ipcRenderer.send(callbackChannel, { filepath: filepath, content: getContent() });
+});
+
+
 
 module.exports = {
   setEdited: function(edited) {
-    BrowserWindow.getFocusedWindow().setDocumentEdited(edited);
+	let win = BrowserWindow.getFocusedWindow()
+    if (win) {
+		win.setDocumentEdited(edited)
+	}
   },
   setContentSetter: function(fn) {
     setContent = fn;

@@ -43,7 +43,11 @@ let loadWindows = windowManager => {
 	let recents = loadRecentDocs()
 	_.map(recents, docPath => createDocWindow(docPath, windowManager, ""))
 	
-	windowManager.createWindow()
+	if (recents.length === 0) {
+		windowManager.createWindow()		
+	}
+	
+	return recents
 }
 
 let createDocWindow = (path, windowManager, currentFileContent) => {

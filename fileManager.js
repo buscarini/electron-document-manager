@@ -6,6 +6,7 @@ const BrowserWindow = electron.BrowserWindow;
 const path = require('path');
 const async = require('async');
 const ipcHelper = require('./ipcHelper');
+const { windowTitle } = require(./utils)
 
 var fs = require("fs");
 
@@ -26,9 +27,6 @@ function isEdited(filepath, content) {
 		});
 	}
 }
-
-let removeExt = path => path.substr(0, path.lastIndexOf('.'))
-let windowTitle = filePath => removeExt(basename(filePath))
 
 let getParam = (win, param) => {
 	return new Task(function(reject, resolve) {

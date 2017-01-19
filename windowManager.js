@@ -5,6 +5,7 @@ const app = electron.app;
 const BrowserWindow = electron.BrowserWindow;
 const path = require('path');
 const _ = require('lodash');
+const { windowTitle } = require(./utils)
 
 let Container = (win, path) => {
 	return {
@@ -90,12 +91,12 @@ function setUpWindow(win, filepath, contents) {
 			return c
 		})
 		
-		win.webContents.send('set-filepath', filepath);
-		win.setRepresentedFilename(filepath);
-		win.setTitle(path.basename(filepath));
+		win.webContents.send('set-filepath', filepath)
+		win.setRepresentedFilename(filepath)
+		win.setTitle(windowTitle(filepath))
 	}
 	if(contents) {
-		win.webContents.send('set-content', contents);
+		win.webContents.send('set-content', contents)
 	}
 }
 

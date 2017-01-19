@@ -174,7 +174,7 @@ var initialize = function(options) {
         //to implement later
       },
       closeMethod: function(item, focusedWindow) {
-        fileManager.closeFile(ext)
+        fileManager.closeFile(ext)()
 		saveWindows(windowManager)
       },
 	  processMenu: options.processMenu

@@ -13,7 +13,6 @@ const Immutable = require('immutable')
 const { List, Map } = require('immutable-ext')
 const Task = require('data.task')
 
-
 function isEdited(filepath, content) {
 	console.log(filepath)
 	if(filepath && filepath != 'no-path') {
@@ -43,37 +42,10 @@ function getFilepathAndContent(cb) {
 	ipcHelper.requestFromRenderer(BrowserWindow.getFocusedWindow(), 'filepath_content', function(event, results) {
 		cb(results.filepath, results.content)
 	})
-	
-	// let win = BrowserWindow.getFocusedWindow()
-// 	Immutable.fromJS([ "content", "filepath" ])
-// 		.traverse(Task.of, param => getParam(win, param))
-// 		.fork(console.error, values => {
-// 			console.log("got content and filepath: " + values)
-// 			cb(values.get(0), values.get(1))
-// 			// settings.set(recentFilesKey, pathsList.toJS())
-// 		})
-	
-	// async.parallel({
-	//     'content': function(callback) {
-	// 		ipcHelper.requestFromRenderer(BrowserWindow.getFocusedWindow(), 'content', function(event, content) {
-	// 			console.log("got content")
-	// 			callback(null, content);
-	// 		});
-	//     },
-	//     'filepath': function(callback) {
-	// 		ipcHelper.requestFromRenderer(BrowserWindow.getFocusedWindow(), 'filepath', function(event, filepath) {
-	// 			console.log("got filepath")
-	// 			callback(null, filepath);
-	// 		});
-	//     }
-	// }, function(err, results) {
-	// 	console.log("got content and filepath: " + results)
-	// 	cb(results.filepath, results.content);
-	// });
 }
 
 // OPEN get path to the file-to-open
-function userOpensHandler(callback) {
+function userOpensHandler(callback, ext) {
 	//check if already open
 	async.parallel({
 		currentContent: function(callback) {
@@ -114,15 +86,15 @@ var isSaveAs;
 var returnedFilepathCallback = null;
 var returnedContentCallback = null;
 
-function userSavesHandler() {
-	genericSaveOrSaveAs('save');
+function userSavesHandler(ext) {
+	genericSaveOrSaveAs('save', ext);
 }
 
-function userSaveAsHandler() {
-	genericSaveOrSaveAs('save-as');
+function userSaveAsHandler(ext) {
+	genericSaveOrSaveAs('save-as', ext);
 }
 
-function genericSaveOrSaveAs(type, callback) {
+function genericSaveOrSaveAs(type, ext, callback) {
 	console.log("save or saveas")
 	
 	getFilepathAndContent(function(filepath, content) {
@@ -133,13 +105,20 @@ function genericSaveOrSaveAs(type, callback) {
 			dialog.showSaveDialog(function(filepath) {
 				if(filepath) { //else user cancelled, do nothing
 					//send new filepath to renderer
+					
+					if (path.extname(filepath).length == 0 && ext.length > 0) {
+						filepath = filepath + "." + ext
+					}
+					
 					setImmediate(function() { //wait a tick so that dialog goes away and window focused again
-						BrowserWindow.getFocusedWindow().setRepresentedFilename(filepath);
-						BrowserWindow.getFocusedWindow().setTitle(path.basename(filepath));
-						BrowserWindow.getFocusedWindow().webContents.send('set-filepath', filepath);
-						if(callback) { callback(); }
+						let win = BrowserWindow.getFocusedWindow()
+						win.setRepresentedFilename(filepath)
+						win.setTitle(path.basename(filepath))
+						win.filePath = filepath
+						win.webContents.send('set-filepath', filepath)
+						if(callback) { callback() }
 					});
-					writeToFile(filepath, content);
+					writeToFile(filepath, content)
 				}
 			});
 		} else {
@@ -171,9 +150,12 @@ function resolveClose(edited, content) {
 	if(!edited && content === "") {
 		BrowserWindow.getFocusedWindow().close();
 	} else if(!edited && content !== "") {
+		console.log("in resolve close")
 		genericSaveOrSaveAs('save', function() {
 			BrowserWindow.getFocusedWindow().close();
 		});
+		
+		console.log("done generic save")
 	} else {
 		// confirm with dialog
 		var button = dialog.showMessageBox({

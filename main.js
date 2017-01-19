@@ -29,17 +29,12 @@ let winPath = win => {
 }
 
 let saveWindows = windowManager => {
-	console.log("save windows")
-	
-	var windows = windowManager.getWindows()
-	
-	Immutable.fromJS(windows)
-		.traverse(Task.of, winPath)
-		.fork(console.error, pathsList => {
-			console.log("perform save windows")
-			console.log(pathsList.toArray())
-			settings.set(recentFilesKey, pathsList.toArray())
-		})
+	loadProperties(windowManager, properties => {
+		console.log("save windows")
+		console.log(properties)
+		
+		settings.set(recentFilesKey, properties)
+	})
 }
 
 let loadRecentDocs = () => {
@@ -49,9 +44,9 @@ let loadRecentDocs = () => {
 	return _.defaultTo(recents, [])
 }
 
-let loadWindows = windowManager => {
-	let recents = loadRecentDocs()
-	_.map(recents, docPath => createDocWindow(docPath, windowManager))
+let loadWindows = windowManager => {	
+	let recents = _.filter(loadRecentDocs(), recent => typeof recent === 'object')
+	_.map(recents, prop => createDocWindow(prop, windowManager, () => saveWindows(windowManager)))
 	
 	if (recents.length === 0) {
 		windowManager.createWindow()		
@@ -60,43 +55,101 @@ let loadWindows = windowManager => {
 	return recents
 }
 
-let createDocWindow = (path, windowManager, created) => {
+let createDocWindow = (properties, windowManager, onChange) => {
     //not open, do the rest of the stuff
 	let win = BrowserWindow.getFocusedWindow()
+	let path = properties.filepath
 	
-	fs.readFile(path, function(err, openFileContent) {
-	    //check if should open in current window or new
-	    var isEdited = fileManager.fileIsEdited(path, openFileContent)
+	let createWin = (path, contents) => {
+	    var isEdited = fileManager.fileIsEdited(path, contents)
 
-	    if(win && !isEdited && openFileContent === "") {
-	      //open in current window
-	      windowManager.setUpWindow(win, filepath, openFileContent)
+	    if(win && !isEdited && contents === "") {
+			//open in current window
+			windowManager.setUpWindow(win, filepath, contents)
 	    } else {
-	      //open in different window
-	      windowManager.createWindow({
-	        focusedWindow: win,
-	        filepath: path,
-	        fileContent: openFileContent
-	      })
-		  
-		  if (created) created()
+
+			let options = {
+				focusedWindow: win,
+				filepath: path,
+				fileContent: contents,
+				x: properties.x,
+				y: properties.y,
+				width: properties.width,
+				height: properties.height,
+				onChange: onChange
+			}
+		
+			console.log("options")
+			console.log(options)
+
+			windowManager.createWindow(options)
+	  
+			if (onChange) onChange()
 	    }
+	}
+	
+	if (path) {
+		fs.readFile(path, function(err, contents) {
+		    createWin(path, contents)
+		})		
+	}
+	else {
+		createWin(path, "")
+	}
+}
+
+let loadFilePaths = (windowManager, completion) => {
+    var windows = windowManager.getWindows();
+	
+	let calls = _.map(windows, win => {
+		return callback => {
+	        ipcHelper.requestFromRenderer(win, 'filepath', function(event, winFilepath) {
+	          callback(null, winFilepath);
+	        })			
+		}
 	})
+
+    //not sure if ipcHelper response will work with paralle, so doing this in series
+    async.series(calls, function(err, results) {
+		console.log("load file paths")
+		console.log(results)
+		completion(results)
+    })
+}
+
+let loadProperties = (windowManager, completion) => {
+    var containers = windowManager.getWindowContainers()
+
+	let results = _.map(containers, c => {
+		return {
+			filepath: c.filePath,
+			x: c.window.getBounds().x,
+			y: c.window.getBounds().y,
+			width: c.window.getBounds().width,
+			height: c.window.getBounds().height
+		}
+	})
+	
+	completion(results)
 }
 
 var initialize = function(options) {
 
-  windowManager.initializeWithEntryPoint(options.entryPoint);
+	windowManager.initializeWithEntryPoint(options.entryPoint)
+
+	let ext = _.defaultTo(options.docExtension, "")
+	
 
   // Quit when all windows are closed.
   app.on('window-all-closed', function() {
     // On OS X it is common for applications and their menu bar
     // to stay active until the user quits explicitly with Cmd + Q
     if (process.platform != 'darwin') {
-	  saveWindows(windowManager)
+	  // saveWindows(windowManager)
       app.quit();
-    } else {
-      menuManager.updateMenu(options.processMenu);
+	}
+	else {
+		menuManager.updateMenu(options.processMenu);
     }
   });
 
@@ -117,36 +170,27 @@ var initialize = function(options) {
         fileManager.openFile(function(err, filepath, currentFileContent, openFileContent) {
           //check if open in other window
           var windows = windowManager.getWindows();
+		  
+		  let winForFile = _.reduce(windows, (winForFile, win) =>  {
+				return (win.filePath === filepath) ? win : winForFile
+		  }, null)
 
-          var checkFilepathFuncs = [];
-          windows.forEach(function(win) {
-            checkFilepathFuncs.push(function(callback) {
-              ipcHelper.requestFromRenderer(win, 'filepath', function(event, winFilepath) {
-                var alreadyOpen = false;
-                if(winFilepath === filepath) {
-                  alreadyOpen = true;
-                  win.focus();
-                }
-                callback(null, alreadyOpen);
-              });
-            });
-          });
-
-          //not sure if ipcHelper response will work with paralle, so doing this in series
-          async.series(checkFilepathFuncs, function(err, results) {
-            if(!_.includes(results, true)) {
-            	createDocWindow(filepath, windowManager, () => saveWindows(windowManager))
-            }
-          });
+		  if (winForFile) {
+			  winForFile.focus()
+		  }
+		  else {
+			  createDocWindow({ filepath: filepath }, windowManager, () => saveWindows(windowManager))
+		  }
+		  
         });
       },
       saveMethod: function(item, focusedWindow) {
 		  console.log("save File")
-        fileManager.saveFile()
+        fileManager.saveFile(ext)
 		saveWindows(windowManager)
       },
       saveAsMethod: function(item, focusedWindow) {
-        fileManager.saveFileAs()
+        fileManager.saveFileAs(ext)
 		saveWindows(windowManager)
       },
       renameMethod: function(item, focusedWindow) {
@@ -155,7 +199,7 @@ var initialize = function(options) {
       },
       closeMethod: function(item, focusedWindow) {
         fileManager.closeFile()
-		saveWindows(windowManager)
+		// saveWindows(windowManager)
       },
 	  processMenu: options.processMenu
     });

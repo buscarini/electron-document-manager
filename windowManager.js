@@ -6,67 +6,136 @@ const BrowserWindow = electron.BrowserWindow;
 const path = require('path');
 const _ = require('lodash');
 
-var windows = [];
+let Container = (win, path) => {
+	return {
+		window: win,
+		id: win.id,
+		path: path
+	}
+}
+
+var containers = []
 var untitledIndex = 1;
 var indexFile;
 
 var focusUpdateHandler = null;
 
 function createWindow(options) {
-  options = options || {};
+	options = options || {};
+	
+	let onChange = _.defaultTo(options.onChange, x => x)
 
-  //pick a title (set as BrowserWindow.title and send with set-title)
-  var title = options.filepath ? path.basename(options.filepath) : ( "Untitled " + untitledIndex++ );
+	//pick a title (set as BrowserWindow.title and send with set-title)
+	var title = options.filepath ? path.basename(options.filepath) : ( "Untitled " + untitledIndex++ );
 
-  var parameters = {
-      width: 800,
-      height: 600,
-      title: title
-  };
+	var parameters = {
+		x: _.defaultTo(options.x, null),
+		y: _.defaultTo(options.y, null),
+		width: _.defaultTo(options.width, 900),
+		height: _.defaultTo(options.height, 600),
+		title: title
+	};
 
-  if(options.focusedWindow) {
-    var bounds = options.focusedWindow.getBounds();
-    parameters = _.extend(parameters, {
-      x: bounds.x + 20,
-      y: bounds.y + 20
-    });
-  }
+	if(options.focusedWindow) {
+		var bounds = options.focusedWindow.getBounds();
+		parameters = _.extend(parameters, {
+			x: bounds.x + 20,
+			y: bounds.y + 20
+		});
+	}
 
-  // Create the browser window.
-  var win = new BrowserWindow(parameters);
-  windows.push(win);
+	console.log(containers)
 
-  // and load the index.html of the app.
-  win.loadURL(indexFile);
+	parameters = _.extend(parameters, { show: false })
 
-  win.webContents.on('did-finish-load', function() {
-    setUpWindow(win, options.filepath, options.fileContent);
-  });
+	// Create the browser window.
+	var win = null
+	win = new BrowserWindow(parameters);
+	win.once('ready-to-show', () => {
+	  win.show()
+	})
+	
+	// try {
+	//
+	// }
+	// catch(err) {
+	// 	console.log("Error creating new window: " + err)
+	//
+	// 	return
+	// }
 
-  // Emitted when the window is closed.
-  win.on('closed', function() {
-    // Dereference the window object, usually you would store windows
-    // in an array if your app supports multi windows, this is the time
-    // when you should delete the corresponding element.
-    windows = _.without(windows, win);
-  });
+	
+	console.log(win.id)
+	
+	let container = Container(win, options.filepath)
+	containers.push(container)
 
-  if(focusUpdateHandler) {
-    focusUpdateHandler();
-    win.on('focus', focusUpdateHandler);
-    win.on('blur', focusUpdateHandler);
-  }
+	// and load the index.html of the app.
+	win.loadURL(indexFile);
+
+	win.webContents.on('did-finish-load', function() {
+		setUpWindow(win, options.filepath, options.fileContent);
+	});
+	
+	let filePath = options.filepath
+
+	let winId = win.id
+
+	// Emitted when the window will close
+		
+	win.on('closed', function() {
+		// Dereference the window object, usually you would store windows
+		// in an array if your app supports multi windows, this is the time
+		// when you should delete the corresponding element.
+		// win.removeAllListeners()
+
+		console.log(containers)
+		containers = _.filter(containers, container => container.id !== winId)
+		console.log(containers)
+
+		console.log("window closed")
+		
+		// win = null
+	});
+	
+	// win.on('closed', function() {
+// 		// Dereference the window object, usually you would store windows
+// 		// in an array if your app supports multi windows, this is the time
+// 		// when you should delete the corresponding element.
+// 		win.removeAllListeners()
+//
+// 		console.log("closed window")
+// 		console.log(containers)
+// 		containers = _.filter(containers, container => container.window.id !== win.id)
+// 		console.log(containers)
+// 	});
+
+	win.on('move', () => onChange())
+	win.on('resize', () => onChange())
+
+	if(focusUpdateHandler) {
+		focusUpdateHandler();
+		win.on('focus', focusUpdateHandler);
+		win.on('blur', focusUpdateHandler);
+	}
 }
 
 function setUpWindow(win, filepath, contents) {
-  if(filepath) {
-    win.webContents.send('set-filepath', filepath);
-    win.setRepresentedFilename(filepath);
-    win.setTitle(path.basename(filepath));
-  }
-  if(contents) {
-    win.webContents.send('set-content', contents);
-  }
+	if(filepath) {
+		containers = _.map(containers, c => {
+			if (c.window.id === win.id) {
+				c.path = filepath
+			}
+			return c
+		})
+		
+		win.webContents.send('set-filepath', filepath);
+		win.setRepresentedFilename(filepath);
+		win.setTitle(path.basename(filepath));
+	}
+	if(contents) {
+		win.webContents.send('set-content', contents);
+	}
 }
 
 module.exports = {
@@ -79,7 +148,6 @@ module.exports = {
   initializeWithEntryPoint: function(entryPointArg) {
     indexFile = entryPointArg;
   },
-  getWindows: function() {
-    return windows;
-  }
+  getWindowContainers: function() { return containers },
+  getWindows: function() { return _.map(containers, c => c.window) }
 };

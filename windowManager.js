@@ -11,7 +11,7 @@ let Container = (win, path) => {
 	return {
 		window: win,
 		id: win.id,
-		path: path
+		filePath: path
 	}
 }
 

@@ -40,9 +40,9 @@ ipcRenderer.on('request-filepath', function(event, callbackChannel) {
 // 	ipcRenderer.send(callbackChannel, { filepath: filepath, x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height });
 // });
 
-// ipcRenderer.on('request-filepath_content', function(event, callbackChannel) {
-// 	ipcRenderer.send(callbackChannel, { filepath: filepath, content: getContent() });
-// });
+ipcRenderer.on('request-filepath_content', function(event, callbackChannel) {
+	ipcRenderer.send(callbackChannel, { filepath: filepath, content: getContent() });
+});
 
 
 

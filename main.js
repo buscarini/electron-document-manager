@@ -79,9 +79,6 @@ let createDocWindow = (properties, windowManager, onChange) => {
 				onChange: onChange
 			}
 		
-			console.log("options")
-			console.log(options)
-
 			windowManager.createWindow(options)
 	  
 			if (onChange) onChange()
@@ -96,25 +93,6 @@ let createDocWindow = (properties, windowManager, onChange) => {
 	else {
 		createWin(path, "")
 	}
-}
-
-let loadFilePaths = (windowManager, completion) => {
-    var windows = windowManager.getWindows();
-	
-	let calls = _.map(windows, win => {
-		return callback => {
-	        ipcHelper.requestFromRenderer(win, 'filepath', function(event, winFilepath) {
-	          callback(null, winFilepath);
-	        })			
-		}
-	})
-
-    //not sure if ipcHelper response will work with paralle, so doing this in series
-    async.series(calls, function(err, results) {
-		console.log("load file paths")
-		console.log(results)
-		completion(results)
-    })
 }
 
 let loadProperties = (windowManager, completion) => {
@@ -145,7 +123,6 @@ var initialize = function(options) {
     // On OS X it is common for applications and their menu bar
     // to stay active until the user quits explicitly with Cmd + Q
     if (process.platform != 'darwin') {
-	  // saveWindows(windowManager)
       app.quit();
 	}
 	else {
@@ -185,7 +162,6 @@ var initialize = function(options) {
         });
       },
       saveMethod: function(item, focusedWindow) {
-		  console.log("save File")
         fileManager.saveFile(ext)
 		saveWindows(windowManager)
       },
@@ -198,8 +174,8 @@ var initialize = function(options) {
         //to implement later
       },
       closeMethod: function(item, focusedWindow) {
-        fileManager.closeFile()
-		// saveWindows(windowManager)
+        fileManager.closeFile(ext)
+		saveWindows(windowManager)
       },
 	  processMenu: options.processMenu
     });
@@ -210,9 +186,6 @@ var initialize = function(options) {
 
 	// Restore windows
 	loadWindows(windowManager)
-
-    //create first window
-    // windowManager.createWindow();
   });
 }
 

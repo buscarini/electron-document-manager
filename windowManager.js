@@ -44,8 +44,6 @@ function createWindow(options) {
 		});
 	}
 
-	console.log(containers)
-
 	parameters = _.extend(parameters, { show: false })
 
 	// Create the browser window.
@@ -54,18 +52,6 @@ function createWindow(options) {
 	win.once('ready-to-show', () => {
 	  win.show()
 	})
-	
-	// try {
-	//
-	// }
-	// catch(err) {
-	// 	console.log("Error creating new window: " + err)
-	//
-	// 	return
-	// }
-
-	
-	console.log(win.id)
 	
 	let container = Container(win, options.filepath)
 	containers.push(container)
@@ -80,35 +66,10 @@ function createWindow(options) {
 	let filePath = options.filepath
 
 	let winId = win.id
-
-	// Emitted when the window will close
 		
 	win.on('closed', function() {
-		// Dereference the window object, usually you would store windows
-		// in an array if your app supports multi windows, this is the time
-		// when you should delete the corresponding element.
-		// win.removeAllListeners()
-
-		console.log(containers)
 		containers = _.filter(containers, container => container.id !== winId)
-		console.log(containers)
-
-		console.log("window closed")
-		
-		// win = null
 	});
-	
-	// win.on('closed', function() {
-// 		// Dereference the window object, usually you would store windows
-// 		// in an array if your app supports multi windows, this is the time
-// 		// when you should delete the corresponding element.
-// 		win.removeAllListeners()
-//
-// 		console.log("closed window")
-// 		console.log(containers)
-// 		containers = _.filter(containers, container => container.window.id !== win.id)
-// 		console.log(containers)
-// 	});
 
 	win.on('move', () => onChange())
 	win.on('resize', () => onChange())
@@ -121,7 +82,7 @@ function createWindow(options) {
 }
 
 function setUpWindow(win, filepath, contents) {
-	if(filepath) {
+	if (filepath) {
 		containers = _.map(containers, c => {
 			if (c.window.id === win.id) {
 				c.path = filepath

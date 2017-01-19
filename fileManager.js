@@ -27,6 +27,9 @@ function isEdited(filepath, content) {
 	}
 }
 
+let removeExt = path => path.substr(0, path.lastIndexOf('.'))
+let windowTitle = filePath => removeExt(basename(filePath))
+
 let getParam = (win, param) => {
 	return new Task(function(reject, resolve) {
 		ipcHelper.requestFromRenderer(win, param, function(event, data) {
@@ -38,14 +41,13 @@ let getParam = (win, param) => {
 
 // requests filename and content from current browser window
 function getFilepathAndContent(cb) {
-	
 	ipcHelper.requestFromRenderer(BrowserWindow.getFocusedWindow(), 'filepath_content', function(event, results) {
 		cb(results.filepath, results.content)
 	})
 }
 
 // OPEN get path to the file-to-open
-function userOpensHandler(callback, ext) {
+function userOpensHandler(callback) {
 	//check if already open
 	async.parallel({
 		currentContent: function(callback) {
@@ -86,61 +88,62 @@ var isSaveAs;
 var returnedFilepathCallback = null;
 var returnedContentCallback = null;
 
-function userSavesHandler(ext) {
+let userSavesHandler = ext => {
 	genericSaveOrSaveAs('save', ext);
 }
 
-function userSaveAsHandler(ext) {
+let userSaveAsHandler = ext => {
 	genericSaveOrSaveAs('save-as', ext);
 }
 
-function genericSaveOrSaveAs(type, ext, callback) {
-	console.log("save or saveas")
-	
-	getFilepathAndContent(function(filepath, content) {
-		console.log("filepath")
-		console.log(filepath)
-		
+let genericSaveOrSaveAs = (type, ext, callback) => {
+	getFilepathAndContent(function(filepath, content) {		
 		if (type === 'save-as' || !filepath) {
-			dialog.showSaveDialog(function(filepath) {
-				if(filepath) { //else user cancelled, do nothing
-					//send new filepath to renderer
+			dialog.showSaveDialog({
+				  filters: [
+						{name: 'OneModel', extensions: ['onemodel']},
+						{name: 'All Files', extensions: ['*']}
+				  ]
+				},
+				function(filepath) {
+					if(filepath) { //else user cancelled, do nothing
+						//send new filepath to renderer
 					
-					if (path.extname(filepath).length == 0 && ext.length > 0) {
-						filepath = filepath + "." + ext
+						if (path.extname(filepath).length == 0 && ext.length > 0) {
+							filepath = filepath + "." + ext
+						}
+					
+						setImmediate(function() { //wait a tick so that dialog goes away and window focused again
+							let win = BrowserWindow.getFocusedWindow()
+							win.setRepresentedFilename(filepath)
+							win.setTitle(windowTitle(filepath))
+							win.filePath = filepath
+							win.webContents.send('set-filepath', filepath)
+							if(callback) { callback() }
+						});
+						writeToFile(filepath, content)
 					}
-					
-					setImmediate(function() { //wait a tick so that dialog goes away and window focused again
-						let win = BrowserWindow.getFocusedWindow()
-						win.setRepresentedFilename(filepath)
-						win.setTitle(path.basename(filepath))
-						win.filePath = filepath
-						win.webContents.send('set-filepath', filepath)
-						if(callback) { callback() }
-					});
-					writeToFile(filepath, content)
 				}
-			});
+			)
 		} else {
 			console.log(filepath)
 			writeToFile(filepath, content);
 			if(callback) { callback(); }
 		}
 	});
-
 }
 
-function closeHandler(e) {
+let closeHandler = ext => edited => {
 	getFilepathAndContent(function(filepath, content) {
 		if(filepath) {
-			resolveClose( isEdited(filepath, content) , content);
+			resolveClose( isEdited(filepath, content), ext , content);
 		} else {
-			resolveClose( (content !== ""), content);
+			resolveClose( (content !== ""), ext, content);
 		}
 	});
 }
 
-function resolveClose(edited, content) {
+let resolveClose = (edited, ext, content) => {
 	/*
 		We want to immediately close if:          it has no content and hasn't been edited
 		We want to immediately save and close if: it has content but hasn't been edited
@@ -151,7 +154,7 @@ function resolveClose(edited, content) {
 		BrowserWindow.getFocusedWindow().close();
 	} else if(!edited && content !== "") {
 		console.log("in resolve close")
-		genericSaveOrSaveAs('save', function() {
+		genericSaveOrSaveAs('save', ext, function() {
 			BrowserWindow.getFocusedWindow().close();
 		});
 		

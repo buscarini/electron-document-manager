@@ -1,4 +1,9 @@
 const path = require('path')
 
-export let removeExt = filePath => filePath.substr(0, filePath.lastIndexOf('.'))
-export let windowTitle = filePath => removeExt(basename(filePath))
+let removeExt = filePath => filePath.substr(0, filePath.lastIndexOf('.'))
+let windowTitle = filePath => removeExt(basename(filePath))
+
+module.exports = {
+	removeExt,
+	windowTitle
+};

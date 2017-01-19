@@ -5,7 +5,7 @@ const app = electron.app;
 const BrowserWindow = electron.BrowserWindow;
 const path = require('path');
 const _ = require('lodash');
-const { windowTitle } = require(./utils)
+const { windowTitle } = require('./utils')
 
 let Container = (win, path) => {
 	return {

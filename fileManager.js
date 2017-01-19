@@ -6,7 +6,7 @@ const BrowserWindow = electron.BrowserWindow;
 const path = require('path');
 const async = require('async');
 const ipcHelper = require('./ipcHelper');
-const { windowTitle } = require(./utils)
+const { windowTitle } = require('./utils')
 
 var fs = require("fs");
 

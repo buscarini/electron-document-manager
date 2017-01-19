@@ -27,7 +27,7 @@ function createWindow(options) {
 	let onChange = _.defaultTo(options.onChange, x => x)
 
 	//pick a title (set as BrowserWindow.title and send with set-title)
-	var title = options.filepath ? path.basename(options.filepath) : ( "Untitled " + untitledIndex++ );
+	var title = options.filepath ? windowTitle(options.filepath) : ( "Untitled " + untitledIndex++ );
 
 	var parameters = {
 		x: _.defaultTo(options.x, null),

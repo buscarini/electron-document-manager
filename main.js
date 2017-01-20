@@ -47,7 +47,7 @@ let loadWindows = windowManager => {
 		.fork(console.error, results => {			
 			let windows = _.filter(results.toArray(), win => win != null)
 			if (windows.length === 0) {
-				windowManager.createWindow()		
+				windowManager.createWindow()
 			}			
 		})
 }
@@ -121,18 +121,21 @@ var initialize = function(options) {
 
 	let ext = _.defaultTo(options.docExtension, "")
 	
-
-  // Quit when all windows are closed.
-  app.on('window-all-closed', function() {
-    // On OS X it is common for applications and their menu bar
-    // to stay active until the user quits explicitly with Cmd + Q
-    if (process.platform != 'darwin') {
-      app.quit();
-	}
-	else {
-		menuManager.updateMenu(options.processMenu);
-    }
-  });
+	app.on('activate', function () {
+	  if (windowManager.getWindowContainers().length === 0) windowManager.createWindow()
+	})
+	
+	// Quit when all windows are closed.
+	app.on('window-all-closed', function() {
+		// On OS X it is common for applications and their menu bar
+		// to stay active until the user quits explicitly with Cmd + Q
+		if (process.platform != 'darwin') {
+		  app.quit();
+		}
+		else {
+			menuManager.updateMenu(options.processMenu);
+		}
+	});
 
   app.on('open-file', function(e, filepath) {
 	app.addRecentDocument(filepath);

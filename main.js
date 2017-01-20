@@ -114,6 +114,7 @@ let loadProperties = (windowManager, completion) => {
 	completion(results)
 }
 
+
 var initialize = function(options) {
 
 	windowManager.initializeWithEntryPoint(options.entryPoint)
@@ -133,8 +134,11 @@ var initialize = function(options) {
     }
   });
 
-  app.on('open-file', function(e, path) {
-    app.addRecentDocument(path);
+  app.on('open-file', function(e, filepath) {
+	app.addRecentDocument(filepath);
+
+	createDocWindow({ filepath: filepath }, windowManager, () => saveWindows(windowManager)).fork(id, id)
+
 	saveWindows(windowManager)
   });
 

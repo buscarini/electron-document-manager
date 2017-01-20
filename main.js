@@ -152,6 +152,7 @@ var initialize = function(options) {
     menuManager.setMenu({
       newMethod: function(item, focusedWindow) {
         windowManager.createWindow({ focusedWindow: focusedWindow });
+		saveWindows(windowManager)
       },
       openMethod: function(item, focusedWindow) {
         fileManager.openFile(function(err, filepath, currentFileContent, openFileContent) {

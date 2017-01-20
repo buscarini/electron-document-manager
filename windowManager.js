@@ -80,6 +80,8 @@ function createWindow(options) {
 		win.on('focus', focusUpdateHandler);
 		win.on('blur', focusUpdateHandler);
 	}
+	
+	return win
 }
 
 function setUpWindow(win, filepath, contents) {

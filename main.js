@@ -16,43 +16,40 @@ const { List, Map } = require('immutable-ext')
 const Task = require('data.task')
 const fs = require("fs")
 
+let id = x => x
+
 let recentFilesKey = "document_recentFiles"
 
 let winPath = win => {
 	return new Task(function(reject, resolve) {
         ipcHelper.requestFromRenderer(win, 'filepath', function(event, winFilepath) {
-			console.log("got filepath")
-			console.log(winFilepath)
 			resolve(winFilepath)
 		})
 	})
 }
 
 let saveWindows = windowManager => {
-	loadProperties(windowManager, properties => {
-		console.log("save windows")
-		console.log(properties)
-		
+	loadProperties(windowManager, properties => {		
 		settings.set(recentFilesKey, properties)
 	})
 }
 
 let loadRecentDocs = () => {
 	let recents = _.filter(settings.getSync(recentFilesKey), x => x !== null)
-	console.log("recents")
-	console.log(recents)
 	return _.defaultTo(recents, [])
 }
 
 let loadWindows = windowManager => {	
 	let recents = _.filter(loadRecentDocs(), recent => typeof recent === 'object')
-	_.map(recents, prop => createDocWindow(prop, windowManager, () => saveWindows(windowManager)))
-	
-	if (recents.length === 0) {
-		windowManager.createWindow()		
-	}
-	
-	return recents
+	Immutable.fromJS(recents)
+		.map(prop => prop.toJS())
+		.traverse(Task.of, prop => createDocWindow(prop, windowManager, () => saveWindows(windowManager)))
+		.fork(console.error, results => {			
+			let windows = _.filter(results.toArray(), win => win != null)
+			if (windows.length === 0) {
+				windowManager.createWindow()		
+			}			
+		})
 }
 
 let createDocWindow = (properties, windowManager, onChange) => {
@@ -66,6 +63,7 @@ let createDocWindow = (properties, windowManager, onChange) => {
 	    if(win && !isEdited && contents === "") {
 			//open in current window
 			windowManager.setUpWindow(win, filepath, contents)
+			return win
 	    } else {
 
 			let options = {
@@ -79,19 +77,24 @@ let createDocWindow = (properties, windowManager, onChange) => {
 				onChange: onChange
 			}
 		
-			windowManager.createWindow(options)
+			let newWin = windowManager.createWindow(options)
 	  
 			if (onChange) onChange()
+				
+			return newWin
 	    }
 	}
 	
 	if (path) {
-		fs.readFile(path, function(err, contents) {
-		    createWin(path, contents)
-		})		
+		return new Task(function(reject, resolve) {
+			fs.readFile(path, function(err, contents) {
+				let result = err ? null : createWin(path, contents)
+				resolve(result)				
+			})
+		})
 	}
 	else {
-		createWin(path, "")
+		return Task.of(createWin(path, ""))
 	}
 }
 
@@ -156,9 +159,8 @@ var initialize = function(options) {
 			  winForFile.focus()
 		  }
 		  else {
-			  createDocWindow({ filepath: filepath }, windowManager, () => saveWindows(windowManager))
+			  createDocWindow({ filepath: filepath }, windowManager, () => saveWindows(windowManager)).fork(id, id)
 		  }
-		  
         });
       },
       saveMethod: function(item, focusedWindow) {

@@ -14,14 +14,15 @@ const Immutable = require('immutable')
 const { List, Map } = require('immutable-ext')
 const Task = require('data.task')
 
+let fileExists = fs.existsSync
+
 function isEdited(filepath, content) {
-	console.log(filepath)
 	if(filepath && filepath != 'no-path') {
 		fs.readFile(filepath, function (err, data) {
-			var savedContent = data.toString();
 			if (err) {
 				return true; //if there's no file, it must have been changed
 			} else {
+				var savedContent = data.toString()
 				return content !== savedContent;
 			}
 		});
@@ -193,6 +194,7 @@ module.exports = {
 	openFile: userOpensHandler,
 	saveFile: userSavesHandler,
 	saveFileAs: userSaveAsHandler,
+	fileExists: fileExists,
 	renameFile: null,
 	closeFile: closeHandler,
 	fileIsEdited: isEdited

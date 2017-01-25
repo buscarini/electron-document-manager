@@ -5,10 +5,6 @@ const app = electron.app;  // Module to control application life.
 const BrowserWindow = electron.BrowserWindow;
 const async = require('async');
 const _ = require('lodash');
-const menuManager = require('./menuManager');
-const fileManager = require('./fileManager');
-const windowManager = require('./windowManager');
-const ipcHelper = require('./ipcHelper');
 const settings = require('electron-settings');
 
 const Immutable = require('immutable')
@@ -16,9 +12,21 @@ const { List, Map } = require('immutable-ext')
 const Task = require('data.task')
 const fs = require("fs")
 
-let id = x => x
+const menuManager = require('./menuManager');
+const fileManager = require('./fileManager');
+const windowManager = require('./windowManager');
+const ipcHelper = require('./ipcHelper');
+const { id } = require('./utils')
 
 let recentFilesKey = "document_recentFiles"
+
+let shouldCloseWindow = ext => {
+	console.log("should close window")
+    fileManager.shouldCloseFile(ext, () => {
+		console.log("save windows")
+		saveWindows(windowManager)        	
+    })
+}
 
 let winPath = win => {
 	return new Task(function(reject, resolve) {
@@ -117,9 +125,9 @@ let loadProperties = (windowManager, completion) => {
 
 var initialize = function(options) {
 
-	windowManager.initializeWithEntryPoint(options.entryPoint)
-
 	let ext = _.defaultTo(options.docExtension, "")
+
+	windowManager.initializeWithEntryPoint(options.entryPoint, () => shouldCloseWindow(ext), options.openDevTools)
 	
 	app.on('activate', function () {
 	  if (windowManager.getWindowContainers().length === 0) windowManager.createWindow()
@@ -184,11 +192,11 @@ var initialize = function(options) {
         //to implement later
       },
       closeMethod: function(item, focusedWindow) {
-        fileManager.closeFile(ext)()
-		saveWindows(windowManager)
+		  focusedWindow.close()
       },
 	  processMenu: options.processMenu
-    });
+    })
+
 
     //set up window menu updates - to be run on focus, blur, and window create
     windowManager.setFocusUpdateHandler(() => menuManager.updateMenu(options.processMenu) );
@@ -196,7 +204,7 @@ var initialize = function(options) {
 
 	// Restore windows
 	loadWindows(windowManager)
-  });
+  })
 }
 
 module.exports = {

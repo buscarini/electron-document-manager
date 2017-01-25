@@ -17,7 +17,9 @@ let Container = (win, path) => {
 
 var containers = []
 var untitledIndex = 1;
-var indexFile;
+var indexFile
+var shouldCloseWindow
+var openDevTools
 
 var focusUpdateHandler = null;
 
@@ -27,7 +29,7 @@ function createWindow(options) {
 	let onChange = _.defaultTo(options.onChange, x => x)
 
 	//pick a title (set as BrowserWindow.title and send with set-title)
-	var title = options.filepath ? windowTitle(options.filepath) : ( "Untitled " + untitledIndex++ );
+	var title = options.filePath ? windowTitle(options.filePath) : ( "Untitled " + untitledIndex++ );
 
 	var parameters = {
 		x: _.defaultTo(options.x, null),
@@ -54,23 +56,41 @@ function createWindow(options) {
 	  win.show()
 	})
 	
-	let container = Container(win, options.filepath)
+	let container = Container(win, options.filePath, options.tmpPath)
 	containers.push(container)
 
 	// and load the index.html of the app.
-	win.loadURL(indexFile);
+	win.loadURL(indexFile)
 
 	win.webContents.on('did-finish-load', function() {
-		setUpWindow(win, options.filepath, options.fileContent);
+		setUpWindow(win, options.filePath, options.fileContent);
 	});
 	
-	let filePath = options.filepath
+	let filePath = options.filePath
 
 	let winId = win.id
-		
+
+
+	// win.on('close', (e) => {
+// 		if (shouldCloseWindow()) e.preventDefault()
+// 	})
+		//
+	// win.onbeforeunload = (e) => {
+	// 	console.log('I do not want to be closed')
+	// 	// if () e.preventDefault()
+	// 	// e.returnValue = shouldCloseWindow()
+	// 	e.returnValue = false
+	// 	return false
+	// }
+	
+    // win.addEventListener('beforeunload', function (event) {
+//        var answer = confirm('Do you want to quit ?');
+//        event.returnValue = answer;
+//      });
+	
 	win.on('closed', function() {
 		containers = _.filter(containers, container => container.id !== winId)
-	});
+	})
 
 	win.on('move', () => onChange())
 	win.on('resize', () => onChange())
@@ -81,21 +101,26 @@ function createWindow(options) {
 		win.on('blur', focusUpdateHandler);
 	}
 	
+	if (openDevTools) {
+		console.log("open dev tools")
+		win.webContents.openDevTools()
+	}
+	
 	return win
 }
 
-function setUpWindow(win, filepath, contents) {
-	if (filepath) {
+function setUpWindow(win, filePath, contents) {
+	if (filePath) {
 		containers = _.map(containers, c => {
 			if (c.window.id === win.id) {
-				c.path = filepath
+				c.path = filePath
 			}
 			return c
 		})
 		
-		win.webContents.send('set-filepath', filepath)
-		win.setRepresentedFilename(filepath)
-		win.setTitle(windowTitle(filepath))
+		win.webContents.send('set-filepath', filePath)
+		win.setRepresentedFilename(filePath)
+		win.setTitle(windowTitle(filePath))
 	}
 	if(contents) {
 		win.webContents.send('set-content', contents)
@@ -103,15 +128,17 @@ function setUpWindow(win, filepath, contents) {
 }
 
 module.exports = {
-  createWindow: createWindow,
-  setUpWindow: setUpWindow,
-  //note: focus and blur handlers will only apply to future windows at creation
-  setFocusUpdateHandler: function(func) {
-    focusUpdateHandler = func;
-  },
-  initializeWithEntryPoint: function(entryPointArg) {
-    indexFile = entryPointArg;
-  },
-  getWindowContainers: function() { return containers },
-  getWindows: function() { return _.map(containers, c => c.window) }
+	createWindow: createWindow,
+	setUpWindow: setUpWindow,
+	//note: focus and blur handlers will only apply to future windows at creation
+	setFocusUpdateHandler: function(func) {
+		focusUpdateHandler = func
+	},
+	initializeWithEntryPoint: function(entryPointArg, askCloseWindow, showDevTools) {
+		indexFile = entryPointArg
+		shouldCloseWindow = askCloseWindow
+		openDevTools = showDevTools
+ 	},
+	getWindowContainers: function() { return containers },
+	getWindows: function() { return _.map(containers, c => c.window) }
 };

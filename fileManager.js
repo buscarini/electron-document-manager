@@ -6,7 +6,7 @@ const BrowserWindow = electron.BrowserWindow;
 const path = require('path');
 const async = require('async');
 const ipcHelper = require('./ipcHelper');
-const { windowTitle } = require('./utils')
+const { windowTitle, id } = require('./utils')
 
 var fs = require("fs");
 
@@ -132,33 +132,53 @@ let genericSaveOrSaveAs = (type, ext, callback) => {
 	});
 }
 
-let closeHandler = ext => edited => {
+let closeHandler = (ext, closed) => {
 	getFilepathAndContent(function(filepath, content) {
 		if(filepath) {
-			resolveClose( isEdited(filepath, content), ext , content);
+			resolveClose( isEdited(filepath, content), ext, content, closed)
 		} else {
-			resolveClose( (content !== ""), ext, content);
+			resolveClose( (content !== ""), ext, content, closed)
 		}
-	});
+	})
 }
 
-let resolveClose = (edited, ext, content) => {
+let shouldCloseFile = (ext, shouldClose) => {
+	getFilepathAndContent(function(filepath, content) {
+		if(filepath) {
+			resolveClose( isEdited(filepath, content), ext, content, shouldClose)
+		} else {
+			resolveClose( (content !== ""), ext, content, shouldClose)
+		}
+	})
+}
+
+let resolveClose = (edited, ext, content, winShouldClose, closed) => {
 	/*
 		We want to immediately close if:          it has no content and hasn't been edited
 		We want to immediately save and close if: it has content but hasn't been edited
 		We want to ask if:                        it has been edited
 	*/
 
+	let shouldClose = winShouldClose ? winShouldClose : id
+	let didClose = closed ? closed : id
+
 	if(!edited && content === "") {
-		BrowserWindow.getFocusedWindow().close();
+		shouldClose(true)
+		
+		// BrowserWindow.getFocusedWindow().close()
+		didClose()
 	} else if(!edited && content !== "") {
-		console.log("in resolve close")
+		shouldClose(false)
+
 		genericSaveOrSaveAs('save', ext, function() {
-			BrowserWindow.getFocusedWindow().close();
+			BrowserWindow.getFocusedWindow().close()
+			// didClose()
 		});
 		
 		console.log("done generic save")
 	} else {
+		shouldClose(false)
+		
 		// confirm with dialog
 		var button = dialog.showMessageBox({
 			type: "question",
@@ -168,12 +188,15 @@ let resolveClose = (edited, ext, content) => {
 
 		if (button === 0) { //SAVE
 			genericSaveOrSaveAs('save', function() {
-				BrowserWindow.getFocusedWindow().close();
+				BrowserWindow.getFocusedWindow().close()
+				// didClose()
 			});
 		} else if (button === 1) { //DISCARD
-			BrowserWindow.getFocusedWindow().close();
+			BrowserWindow.getFocusedWindow().close()
+			// didClose()
 		} else {
 			//CANCEL - do nothing
+			
 		}
 	}
 }
@@ -197,5 +220,6 @@ module.exports = {
 	fileExists: fileExists,
 	renameFile: null,
 	closeFile: closeHandler,
+	shouldCloseFile: shouldCloseFile,
 	fileIsEdited: isEdited
 };

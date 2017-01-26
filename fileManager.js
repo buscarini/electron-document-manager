@@ -87,12 +87,12 @@ var isSaveAs;
 var returnedFilepathCallback = null;
 var returnedContentCallback = null;
 
-let userSavesHandler = ext => {
-	genericSaveOrSaveAs('save', ext);
+let userSavesHandler = (ext, callback) => {
+	genericSaveOrSaveAs('save', ext, callback)
 }
 
-let userSaveAsHandler = ext => {
-	genericSaveOrSaveAs('save-as', ext);
+let userSaveAsHandler = (ext, callback) => {
+	genericSaveOrSaveAs('save-as', ext, callback)
 }
 
 let genericSaveOrSaveAs = (type, ext, callback) => {
@@ -118,16 +118,17 @@ let genericSaveOrSaveAs = (type, ext, callback) => {
 							win.setTitle(windowTitle(filepath))
 							win.filePath = filepath
 							win.webContents.send('set-filepath', filepath)
-							if(callback) { callback() }
 						});
-						writeToFile(filepath, content)
+						writeToFile(filepath, content, callback)
+					}
+					else {
+						if (callback) callback("User cancelled", filepath)
 					}
 				}
 			)
 		} else {
 			console.log(filepath)
-			writeToFile(filepath, content);
-			if(callback) { callback(); }
+			writeToFile(filepath, content, callback)
 		}
 	});
 }
@@ -201,11 +202,12 @@ let resolveClose = (edited, ext, content, winShouldClose, closed) => {
 	}
 }
 
-function writeToFile(filepath, content) {
+function writeToFile(filepath, content, callback) {
 	if (typeof content !== "string") {
 		throw new TypeError("getContent must return a string")
 	}
 	fs.writeFile(filepath, content, function (err) {
+		callback(err, filepath)
 		if (err) {
 			console.log("Write failed: " + err);
 			return;

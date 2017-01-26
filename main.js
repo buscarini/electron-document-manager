@@ -180,7 +180,11 @@ var initialize = function(options) {
         });
       },
       saveMethod: function(item, focusedWindow) {
-        fileManager.saveFile(ext)
+        fileManager.saveFile(ext, (err, path) => {
+        	if (!err) {
+				focusedWindow.webContents.send('document_saved', path)
+        	}
+        })
 		saveWindows(windowManager)
       },
       saveAsMethod: function(item, focusedWindow) {

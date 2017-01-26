@@ -7,7 +7,8 @@ const BrowserWindow = electron.remote.BrowserWindow;
 var filepath = null,
     title = "Untitled",
     setContent = null,
-    getContent = null;
+    getContent = null,
+	notifyDocSaved = null
 
 ipcRenderer.on('set-content', function(event, content, callbackChannel) {
   setContent(content.toString());
@@ -19,10 +20,16 @@ ipcRenderer.on('request-content', function(event, callbackChannel) {
 });
 
 ipcRenderer.on('set-filepath', function(event, filepathArg, callbackChannel) {
-	console.log("set filepath " + filepathArg)
-	filepath = filepathArg;
-	if(callbackChannel) ipcRenderer.send(callbackChannel);
+	filepath = filepathArg
+	if(callbackChannel) ipcRenderer.send(callbackChannel)
 });
+
+ipcRenderer.on('document_saved', function(event, filepathArg, callbackChannel) {
+	filepath = filepathArg
+	if (notifyDocSaved) notifyDocSaved(filepath)
+	if(callbackChannel) ipcRenderer.send(callbackChannel)	
+});
+
 
 ipcRenderer.on('request-filepath', function(event, callbackChannel) {
 	console.log("requesting filepath " + filepath)
@@ -54,9 +61,12 @@ module.exports = {
 	}
   },
   setContentSetter: function(fn) {
-    setContent = fn;
+    setContent = fn
   },
   setContentGetter: function(fn) {
-    getContent = fn;
+    getContent = fn
+  },
+  documentSaved: function(fn) {
+  	notifyDocSaved = fn
   }
 }

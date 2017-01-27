@@ -122,7 +122,6 @@ function createWindow(options) {
 	}
 	
 	if (openDevTools) {
-		console.log("open dev tools")
 		win.webContents.openDevTools()
 	}
 	
@@ -160,13 +159,11 @@ module.exports = {
 		openDevTools = showDevTools
  	},
 	windowCloseCancelled: () => {
-		console.log("app is not quitting")
 		appIsQuitting = false
 	},
 	getWindowContainers: function() { return containers },
 	getWindows: function() { return _.map(containers, c => c.window) },
 	setQuitting: function(isQuitting) {
-		console.log("app is quitting " + isQuitting)
 		appIsQuitting = isQuitting
 	}
 };

@@ -21,9 +21,7 @@ let { id } = require('./utils')
 let recentFilesKey = "document_recentFiles"
 
 let shouldCloseWindow = ext => {
-	console.log("should close window")
     fileManager.shouldCloseFile(ext, () => {
-		console.log("save windows")
 		saveWindows(windowManager)        	
     })
 }
@@ -127,11 +125,13 @@ let loadProperties = (windowManager, completion) => {
 var initialize = function(options) {
 
 	let ext = _.defaultTo(options.docExtension, "")
+	
+	let localize = options.localize || id
+	fileManager.localize(localize)
 
 	windowManager.initializeWithEntryPoint(options.entryPoint, () => shouldCloseWindow(ext), options.openDevTools)
 
 	fileManager.windowCloseCancelled(() => {
-		console.log("window close cancelled")
 		windowManager.windowCloseCancelled()
 	})
 	

@@ -16,6 +16,7 @@ const Task = require('data.task')
 
 let fileExists = fs.existsSync
 
+var localize
 var windowCloseCancelled
 
 function isEdited(filepath, content) {
@@ -34,7 +35,6 @@ function isEdited(filepath, content) {
 let getParam = (win, param) => {
 	return new Task(function(reject, resolve) {
 		ipcHelper.requestFromRenderer(win, param, function(event, data) {
-			console.log("Retrieved " + param + " value: " + data + " event " + event)
 			resolve(data)
 		})
 	})
@@ -98,13 +98,16 @@ let userSaveAsHandler = (ext, callback) => {
 }
 
 let genericSaveOrSaveAs = (type, ext, callback) => {
+	
+	let translate = localize || id
+	
 	let win = BrowserWindow.getFocusedWindow()
 	getFilepathAndContent(win, function(filepath, content) {		
 		if (type === 'save-as' || !filepath) {
 			dialog.showSaveDialog({
 				  filters: [
 						{name: 'OneModel', extensions: ['onemodel']},
-						{name: 'All Files', extensions: ['*']}
+						{name: translate('All Files'), extensions: ['*']}
 				  ]
 				},
 				function(filepath) {
@@ -130,7 +133,6 @@ let genericSaveOrSaveAs = (type, ext, callback) => {
 				}
 			)
 		} else {
-			console.log(filepath)
 			writeToFile(filepath, content, callback)
 		}
 	});
@@ -165,6 +167,8 @@ let resolveClose = (edited, ext, content, performClose) => {
 	*/
 
 	let doClose = performClose ? performClose : id
+	
+	let translate = localize || id
 
 	if(!edited && content === "") {
 		// BrowserWindow.getFocusedWindow().close()
@@ -173,14 +177,13 @@ let resolveClose = (edited, ext, content, performClose) => {
 	} else if(!edited && content !== "") {
 		genericSaveOrSaveAs('save', ext, function() {
 			performClose()
-			console.log("done generic save")
 		});
 	} else {		
 		// confirm with dialog
 		var button = dialog.showMessageBox({
 			type: "question",
-			buttons: ["Save changes", "Discard changes", "Cancel"],
-			message: "Your file was changed since saving the last time. Do you want to save before closing?"
+			buttons: [ translate("Save changes"), translate("Discard changes"), translate("Cancel")],
+			message: translate("Your file was changed since saving the last time. Do you want to save before closing?")
 		});
 
 		if (button === 0) { //SAVE
@@ -191,7 +194,6 @@ let resolveClose = (edited, ext, content, performClose) => {
 			performClose()
 		} else {
 			//CANCEL - do nothing
-			console.log("cancel window close")
 			if (windowCloseCancelled) windowCloseCancelled()
 		}
 	}
@@ -211,6 +213,9 @@ function writeToFile(filepath, content, callback) {
 }
 
 module.exports = {
+	localize: (translate) => {
+		localize = translate
+	},
 	openFile: userOpensHandler,
 	saveFile: userSavesHandler,
 	saveFileAs: userSaveAsHandler,

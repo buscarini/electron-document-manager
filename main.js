@@ -129,9 +129,18 @@ var initialize = function(options) {
 	let ext = _.defaultTo(options.docExtension, "")
 
 	windowManager.initializeWithEntryPoint(options.entryPoint, () => shouldCloseWindow(ext), options.openDevTools)
+
+	fileManager.windowCloseCancelled(() => {
+		console.log("window close cancelled")
+		windowManager.windowCloseCancelled()
+	})
 	
 	app.on('activate', function () {
 	  if (windowManager.getWindowContainers().length === 0) windowManager.createWindow({ docExtension: ext })
+	})
+	
+	app.on('before-quit', function() {
+		windowManager.setQuitting(true)
 	})
 	
 	// Quit when all windows are closed.

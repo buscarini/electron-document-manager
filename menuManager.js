@@ -222,7 +222,10 @@ function getMenuTemplate(options) {
         {
           label: 'Quit',
           accelerator: 'Command+Q',
-          click: function() { app.quit() },
+          click: function() {
+			  console.log("quitting")
+			  app.quit()
+		  },
 	      id: 'quit'
         },
       ]

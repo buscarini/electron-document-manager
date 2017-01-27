@@ -32,7 +32,6 @@ ipcRenderer.on('document_saved', function(event, filepathArg, callbackChannel) {
 
 
 ipcRenderer.on('request-filepath', function(event, callbackChannel) {
-	console.log("requesting filepath " + filepath)
 	var path = filepath
 	if (filepath == null) {
 		path = ""
@@ -57,6 +56,7 @@ module.exports = {
   setEdited: function(edited) {
 	let win = BrowserWindow.getFocusedWindow()
     if (win) {
+		console.log("setting doc edited " + edited)
 		win.setDocumentEdited(edited)
 	}
   },

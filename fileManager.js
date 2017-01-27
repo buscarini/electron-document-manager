@@ -16,6 +16,8 @@ const Task = require('data.task')
 
 let fileExists = fs.existsSync
 
+var windowCloseCancelled
+
 function isEdited(filepath, content) {
 	if(filepath && filepath != 'no-path') {
 		fs.readFile(filepath, function (err, data) {
@@ -171,9 +173,8 @@ let resolveClose = (edited, ext, content, performClose) => {
 	} else if(!edited && content !== "") {
 		genericSaveOrSaveAs('save', ext, function() {
 			performClose()
+			console.log("done generic save")
 		});
-		
-		console.log("done generic save")
 	} else {		
 		// confirm with dialog
 		var button = dialog.showMessageBox({
@@ -189,7 +190,9 @@ let resolveClose = (edited, ext, content, performClose) => {
 		} else if (button === 1) { //DISCARD
 			performClose()
 		} else {
-			//CANCEL - do nothing			
+			//CANCEL - do nothing
+			console.log("cancel window close")
+			if (windowCloseCancelled) windowCloseCancelled()
 		}
 	}
 }
@@ -214,5 +217,8 @@ module.exports = {
 	fileExists: fileExists,
 	renameFile: null,
 	close: closeWindow,
-	fileIsEdited: isEdited
+	fileIsEdited: isEdited,
+	windowCloseCancelled: (cancelled) => {
+		windowCloseCancelled = cancelled
+	}
 };

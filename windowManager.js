@@ -22,6 +22,7 @@ var untitledIndex = 1;
 var indexFile
 var shouldCloseWindow
 var openDevTools
+var appIsQuitting = false
 
 var focusUpdateHandler = null;
 
@@ -105,6 +106,10 @@ function createWindow(options) {
 	
 	win.on('closed', function() {
 		containers = _.filter(containers, container => container.id !== winId)
+		
+		if (appIsQuitting && containers.length == 0) {
+			app.exit(0)
+		}
 	})
 
 	win.on('move', () => onChange())
@@ -154,6 +159,14 @@ module.exports = {
 		shouldCloseWindow = askCloseWindow
 		openDevTools = showDevTools
  	},
+	windowCloseCancelled: () => {
+		console.log("app is not quitting")
+		appIsQuitting = false
+	},
 	getWindowContainers: function() { return containers },
-	getWindows: function() { return _.map(containers, c => c.window) }
+	getWindows: function() { return _.map(containers, c => c.window) },
+	setQuitting: function(isQuitting) {
+		console.log("app is quitting " + isQuitting)
+		appIsQuitting = isQuitting
+	}
 };

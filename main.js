@@ -12,11 +12,11 @@ const { List, Map } = require('immutable-ext')
 const Task = require('data.task')
 const fs = require("fs")
 
-const menuManager = require('./menuManager');
-const fileManager = require('./fileManager');
-const windowManager = require('./windowManager');
-const ipcHelper = require('./ipcHelper');
-const { id } = require('./utils')
+let menuManager = require('./menuManager')
+let fileManager = require('./fileManager')
+let windowManager = require('./windowManager')
+let ipcHelper = require('./ipcHelper')
+let { id } = require('./utils')
 
 let recentFilesKey = "document_recentFiles"
 
@@ -47,20 +47,20 @@ let loadRecentDocs = () => {
 	return _.defaultTo(recents, [])
 }
 
-let loadWindows = windowManager => {	
+let loadWindows = (windowManager, ext) => {	
 	let recents = _.filter(loadRecentDocs(), recent => typeof recent === 'object')
 	Immutable.fromJS(recents)
 		.map(prop => prop.toJS())
-		.traverse(Task.of, prop => createDocWindow(prop, windowManager, () => saveWindows(windowManager)))
+		.traverse(Task.of, prop => createDocWindow(prop, windowManager, ext, () => saveWindows(windowManager)))
 		.fork(console.error, results => {			
 			let windows = _.filter(results.toArray(), win => win != null)
 			if (windows.length === 0) {
-				windowManager.createWindow()
+				windowManager.createWindow({ docExtension: ext })
 			}			
 		})
 }
 
-let createDocWindow = (properties, windowManager, onChange) => {
+let createDocWindow = (properties, windowManager, ext, onChange) => {
     //not open, do the rest of the stuff
 	let win = BrowserWindow.getFocusedWindow()
 	let path = properties.filepath
@@ -82,7 +82,8 @@ let createDocWindow = (properties, windowManager, onChange) => {
 				y: properties.y,
 				width: properties.width,
 				height: properties.height,
-				onChange: onChange
+				onChange: onChange,
+				docExtension: ext
 			}
 		
 			let newWin = windowManager.createWindow(options)
@@ -130,7 +131,7 @@ var initialize = function(options) {
 	windowManager.initializeWithEntryPoint(options.entryPoint, () => shouldCloseWindow(ext), options.openDevTools)
 	
 	app.on('activate', function () {
-	  if (windowManager.getWindowContainers().length === 0) windowManager.createWindow()
+	  if (windowManager.getWindowContainers().length === 0) windowManager.createWindow({ docExtension: ext })
 	})
 	
 	// Quit when all windows are closed.
@@ -148,7 +149,7 @@ var initialize = function(options) {
   app.on('open-file', function(e, filepath) {
 	app.addRecentDocument(filepath);
 
-	createDocWindow({ filepath: filepath }, windowManager, () => saveWindows(windowManager)).fork(id, id)
+	createDocWindow({ filepath: filepath }, windowManager, ext, () => saveWindows(windowManager)).fork(id, id)
 
 	saveWindows(windowManager)
   });
@@ -159,7 +160,7 @@ var initialize = function(options) {
     //set up menu
     menuManager.setMenu({
       newMethod: function(item, focusedWindow) {
-        windowManager.createWindow({ focusedWindow: focusedWindow });
+        windowManager.createWindow({ focusedWindow: focusedWindow, docExtension: ext });
 		saveWindows(windowManager)
       },
       openMethod: function(item, focusedWindow) {
@@ -175,7 +176,7 @@ var initialize = function(options) {
 			  winForFile.focus()
 		  }
 		  else {
-			  createDocWindow({ filepath: filepath }, windowManager, () => saveWindows(windowManager)).fork(id, id)
+			  createDocWindow({ filepath: filepath }, windowManager, ext, () => saveWindows(windowManager)).fork(id, id)
 		  }
         });
       },
@@ -196,7 +197,7 @@ var initialize = function(options) {
         //to implement later
       },
       closeMethod: function(item, focusedWindow) {
-		  focusedWindow.close()
+		  BrowserWindow.getFocusedWindow().close()
       },
 	  processMenu: options.processMenu
     })
@@ -207,7 +208,7 @@ var initialize = function(options) {
 
 
 	// Restore windows
-	loadWindows(windowManager)
+	loadWindows(windowManager, ext)
   })
 }
 

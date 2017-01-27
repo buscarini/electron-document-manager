@@ -39,8 +39,8 @@ let getParam = (win, param) => {
 }
 
 // requests filename and content from current browser window
-function getFilepathAndContent(cb) {
-	ipcHelper.requestFromRenderer(BrowserWindow.getFocusedWindow(), 'filepath_content', function(event, results) {
+function getFilepathAndContent(win, cb) {
+	ipcHelper.requestFromRenderer(win, 'filepath_content', function(event, results) {
 		cb(results.filepath, results.content)
 	})
 }
@@ -96,7 +96,8 @@ let userSaveAsHandler = (ext, callback) => {
 }
 
 let genericSaveOrSaveAs = (type, ext, callback) => {
-	getFilepathAndContent(function(filepath, content) {		
+	let win = BrowserWindow.getFocusedWindow()
+	getFilepathAndContent(win, function(filepath, content) {		
 		if (type === 'save-as' || !filepath) {
 			dialog.showSaveDialog({
 				  filters: [
@@ -134,7 +135,8 @@ let genericSaveOrSaveAs = (type, ext, callback) => {
 }
 
 let closeHandler = (ext, closed) => {
-	getFilepathAndContent(function(filepath, content) {
+	let win = BrowserWindow.getFocusedWindow()
+	getFilepathAndContent(win, function(filepath, content) {
 		if(filepath) {
 			resolveClose( isEdited(filepath, content), ext, content, closed)
 		} else {
@@ -143,43 +145,36 @@ let closeHandler = (ext, closed) => {
 	})
 }
 
-let shouldCloseFile = (ext, shouldClose) => {
-	getFilepathAndContent(function(filepath, content) {
+let closeWindow = (win, ext, performClose) => {
+	getFilepathAndContent(win, function(filepath, content) {
 		if(filepath) {
-			resolveClose( isEdited(filepath, content), ext, content, shouldClose)
+			resolveClose( isEdited(filepath, content), ext, content, performClose)
 		} else {
-			resolveClose( (content !== ""), ext, content, shouldClose)
+			resolveClose( (content !== ""), ext, content, performClose)
 		}
 	})
 }
 
-let resolveClose = (edited, ext, content, winShouldClose, closed) => {
+let resolveClose = (edited, ext, content, performClose) => {
 	/*
 		We want to immediately close if:          it has no content and hasn't been edited
 		We want to immediately save and close if: it has content but hasn't been edited
 		We want to ask if:                        it has been edited
 	*/
 
-	let shouldClose = winShouldClose ? winShouldClose : id
-	let didClose = closed ? closed : id
+	let doClose = performClose ? performClose : id
 
 	if(!edited && content === "") {
-		shouldClose(true)
-		
 		// BrowserWindow.getFocusedWindow().close()
-		didClose()
+		performClose()
+		
 	} else if(!edited && content !== "") {
-		shouldClose(false)
-
 		genericSaveOrSaveAs('save', ext, function() {
-			BrowserWindow.getFocusedWindow().close()
-			// didClose()
+			performClose()
 		});
 		
 		console.log("done generic save")
-	} else {
-		shouldClose(false)
-		
+	} else {		
 		// confirm with dialog
 		var button = dialog.showMessageBox({
 			type: "question",
@@ -189,15 +184,12 @@ let resolveClose = (edited, ext, content, winShouldClose, closed) => {
 
 		if (button === 0) { //SAVE
 			genericSaveOrSaveAs('save', function() {
-				BrowserWindow.getFocusedWindow().close()
-				// didClose()
+				performClose()
 			});
 		} else if (button === 1) { //DISCARD
-			BrowserWindow.getFocusedWindow().close()
-			// didClose()
+			performClose()
 		} else {
-			//CANCEL - do nothing
-			
+			//CANCEL - do nothing			
 		}
 	}
 }
@@ -221,7 +213,6 @@ module.exports = {
 	saveFileAs: userSaveAsHandler,
 	fileExists: fileExists,
 	renameFile: null,
-	closeFile: closeHandler,
-	shouldCloseFile: shouldCloseFile,
+	close: closeWindow,
 	fileIsEdited: isEdited
 };

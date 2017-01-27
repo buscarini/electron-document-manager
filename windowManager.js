@@ -1,11 +1,13 @@
 'use strict';
 
-const electron = require('electron');
-const app = electron.app;
-const BrowserWindow = electron.BrowserWindow;
-const path = require('path');
-const _ = require('lodash');
-const { windowTitle } = require('./utils')
+let electron = require('electron')
+let app = electron.app
+let BrowserWindow = electron.BrowserWindow
+let path = require('path')
+let _ = require('lodash')
+let { windowTitle } = require('./utils')
+
+let fileManager = require('./fileManager')
 
 let Container = (win, path) => {
 	return {
@@ -24,9 +26,11 @@ var openDevTools
 var focusUpdateHandler = null;
 
 function createWindow(options) {
-	options = options || {};
+	options = options || {}
 	
 	let onChange = _.defaultTo(options.onChange, x => x)
+	
+	let ext = options.docExtension || ".onemodel"
 
 	//pick a title (set as BrowserWindow.title and send with set-title)
 	var title = options.filePath ? windowTitle(options.filePath) : ( "Untitled " + untitledIndex++ );
@@ -87,6 +91,17 @@ function createWindow(options) {
 //        var answer = confirm('Do you want to quit ?');
 //        event.returnValue = answer;
 //      });
+
+	win.on('close', function(e) {
+		e.preventDefault()
+		
+		fileManager.close(win, ext, performClose => {
+			containers = _.filter(containers, container => container.id !== winId)			
+			win.hide()
+			win.destroy()
+			win = null			
+		})
+	})
 	
 	win.on('closed', function() {
 		containers = _.filter(containers, container => container.id !== winId)

@@ -97,10 +97,12 @@ function createWindow(options) {
 		e.preventDefault()
 		
 		fileManager.close(win, ext, performClose => {
-			containers = _.filter(containers, container => container.id !== winId)			
-			win.hide()
-			win.destroy()
-			win = null			
+			containers = _.filter(containers, container => container.id !== winId)
+			if (win) {
+				win.hide()
+				win.destroy()
+				win = null
+			}
 		})
 	})
 	

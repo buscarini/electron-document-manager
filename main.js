@@ -19,6 +19,7 @@ let ipcHelper = require('./ipcHelper')
 let { id } = require('./utils')
 
 let recentFilesKey = "document_recentFiles"
+let currentFilesKey = "document_currentFiles"
 
 let shouldCloseWindow = ext => {
     fileManager.shouldCloseFile(ext, () => {
@@ -28,7 +29,7 @@ let shouldCloseWindow = ext => {
 
 let winPath = win => {
 	return new Task(function(reject, resolve) {
-        ipcHelper.requestFromRenderer(win, 'filepath', function(event, winFilepath) {
+        ipcHelper.requestFromRenderer(win, 'filePath', function(event, winFilepath) {
 			resolve(winFilepath)
 		})
 	})
@@ -36,8 +37,12 @@ let winPath = win => {
 
 let saveWindows = windowManager => {
 	loadProperties(windowManager, properties => {		
-		settings.set(recentFilesKey, properties)
+		settings.set(currentFilesKey, properties)
 	})
+}
+
+let clearRecentDocs = () => {
+	settings.set(recentFilesKey, [])
 }
 
 let loadRecentDocs = () => {
@@ -45,8 +50,28 @@ let loadRecentDocs = () => {
 	return _.defaultTo(recents, [])
 }
 
+let saveRecentDocs = (docs) => {
+	console.log("saveRecentDocs")
+	console.log(docs)
+	settings.set(recentFilesKey, docs)
+}
+
+let addRecentDoc = doc => {
+	loadProperties(windowManager, properties => {
+		let docProps = _.filter(properties, prop => prop.filePath === doc.filePath)[0]
+		let recents = loadRecentDocs()
+		let newRecents = _.concat(recents, doc)
+		saveRecentDocs(newRecents)		
+	})
+}
+
+let loadCurrentDocs = () => {
+	let current = _.filter(settings.getSync(currentFilesKey), x => x !== null)
+	return _.defaultTo(current, [])
+}
+
 let loadWindows = (windowManager, ext) => {	
-	let recents = _.filter(loadRecentDocs(), recent => typeof recent === 'object')
+	let recents = _.filter(loadCurrentDocs(), recent => typeof recent === 'object')
 	Immutable.fromJS(recents)
 		.map(prop => prop.toJS())
 		.traverse(Task.of, prop => createDocWindow(prop, windowManager, ext, () => saveWindows(windowManager)))
@@ -61,20 +86,20 @@ let loadWindows = (windowManager, ext) => {
 let createDocWindow = (properties, windowManager, ext, onChange) => {
     //not open, do the rest of the stuff
 	let win = BrowserWindow.getFocusedWindow()
-	let path = properties.filepath
+	let path = properties.filePath
 	
 	let createWin = (path, contents) => {
 	    var isEdited = fileManager.fileIsEdited(path, contents)
 
 	    if(win && !isEdited && contents === "") {
 			//open in current window
-			windowManager.setUpWindow(win, filepath, contents)
+			windowManager.setUpWindow(win, filePath, contents)
 			return win
 	    } else {
 
 			let options = {
 				focusedWindow: win,
-				filepath: path,
+				filePath: path,
 				fileContent: contents,
 				x: properties.x,
 				y: properties.y,
@@ -110,7 +135,7 @@ let loadProperties = (windowManager, completion) => {
 
 	let results = _.map(containers, c => {
 		return {
-			filepath: c.filePath,
+			filePath: c.filePath,
 			x: c.window.getBounds().x,
 			y: c.window.getBounds().y,
 			width: c.window.getBounds().width,
@@ -130,6 +155,8 @@ var initialize = function(options) {
 	fileManager.localize(localize)
 
 	windowManager.initializeWithEntryPoint(options.entryPoint, () => shouldCloseWindow(ext), options.openDevTools)
+
+	fileManager.setCompareDocument(options.documentChanged)
 
 	fileManager.windowCloseCancelled(() => {
 		windowManager.windowCloseCancelled()
@@ -155,37 +182,40 @@ var initialize = function(options) {
 		}
 	});
 
-  app.on('open-file', function(e, filepath) {
-	app.addRecentDocument(filepath);
+  app.on('open-file', function(e, filePath) {
+	app.addRecentDocument(filePath);
 
-	createDocWindow({ filepath: filepath }, windowManager, ext, () => saveWindows(windowManager)).fork(id, id)
+	createDocWindow({ filePath: filePath }, windowManager, ext, () => saveWindows(windowManager)).fork(id, id)
 
-	saveWindows(windowManager)
+	addRecentDocument({ filePath: filePath })
+
+	saveWindows(windowManager)	
   });
 
   // This method will be called when Electron has finished
   // initialization and is ready to create browser windows.
   app.on('ready', function() {
+	  
     //set up menu
     menuManager.setMenu({
       newMethod: function(item, focusedWindow) {
         windowManager.createWindow({ focusedWindow: focusedWindow, docExtension: ext });
 		saveWindows(windowManager)
       },
-      openMethod: function(item, focusedWindow) {
-        fileManager.openFile(function(err, filepath, currentFileContent, openFileContent) {
+      openMethod: function(item, focusedWindow, filePath) {
+        fileManager.openFile(function(err, filePath, currentFileContent, openFileContent) {
           //check if open in other window
           var windows = windowManager.getWindows();
 		  
 		  let winForFile = _.reduce(windows, (winForFile, win) =>  {
-				return (win.filePath === filepath) ? win : winForFile
+				return (win.filePath === filePath) ? win : winForFile
 		  }, null)
 
 		  if (winForFile) {
 			  winForFile.focus()
 		  }
 		  else {
-			  createDocWindow({ filepath: filepath }, windowManager, ext, () => saveWindows(windowManager)).fork(id, id)
+			  createDocWindow({ filePath: filePath }, windowManager, ext, () => saveWindows(windowManager)).fork(id, id)
 		  }
         });
       },
@@ -208,9 +238,10 @@ var initialize = function(options) {
       closeMethod: function(item, focusedWindow) {
 		  BrowserWindow.getFocusedWindow().close()
       },
-	  processMenu: options.processMenu
+	  processMenu: options.processMenu,
+	  recentDocs: loadRecentDocs(),
+	  clearRecentDocs: clearRecentDocs
     })
-
 
     //set up window menu updates - to be run on focus, blur, and window create
     windowManager.setFocusUpdateHandler(() => menuManager.updateMenu(options.processMenu) );

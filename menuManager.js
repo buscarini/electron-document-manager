@@ -6,6 +6,30 @@ const MenuItem = electron.MenuItem;
 const _ = require('lodash');
 
 function getMenuTemplate(options) {
+	
+	let separator = { type: 'separator' }
+	
+	let recentDocs = _.filter(options.recentDocs || [], doc => typeof doc.filepath === "string" && doc.filepath.length > 0)
+	let recentDocsSubmenu = _.map(recentDocs, doc => {
+		console.log(doc)
+		console.log(doc.filepath)
+		return {
+			label: doc.filepath,
+			click: (item, focusedWindow) => options.openMethod(item, focusedWindow, doc.filepath)
+		}
+	})
+	
+	let recentDocsMenu = _.concat(recentDocsSubmenu, [
+				separator,
+				{
+					label : "Clear Menu",
+					click: event => {
+						let clear = options.clearRecentDocs || id
+						clear()
+					}
+				}
+			])
+	
   var template = [
     {
       label:  'File',
@@ -24,8 +48,11 @@ function getMenuTemplate(options) {
 		  id: 'open'
         },
         {
-          type: 'separator'
+          label: 'Open Recent',
+		  id: 'openrecent',
+		  submenu: recentDocsMenu
         },
+        separator,
         {
           label: 'Save',
           accelerator: 'CmdOrCtrl+S',
@@ -71,9 +98,7 @@ function getMenuTemplate(options) {
           role: 'redo',
 		  id: 'redo'
         },
-        {
-          type: 'separator'
-        },
+        separator,
         {
           label: 'Cut',
           accelerator: 'CmdOrCtrl+X',
@@ -187,18 +212,14 @@ function getMenuTemplate(options) {
           role: 'about',
 		  id: 'about'
         },
-        {
-          type: 'separator'
-        },
+        separator,
         {
           label: 'Services',
           role: 'services',
 		  id: 'services',
           submenu: []
         },
-        {
-          type: 'separator'
-        },
+        separator,
         {
           label: 'Hide ' + name,
           accelerator: 'Command+H',
@@ -216,9 +237,7 @@ function getMenuTemplate(options) {
           role: 'unhide',
 		  id: 'unhide'
         },
-        {
-          type: 'separator'
-        },
+        separator,
         {
           label: 'Quit',
           accelerator: 'Command+Q',
@@ -232,9 +251,7 @@ function getMenuTemplate(options) {
 
     // Window menu.
     template[3].submenu.push(
-      {
-        type: 'separator'
-      },
+      separator,
       {
         label: 'Bring All to Front',
         role: 'front',

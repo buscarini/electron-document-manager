@@ -18,15 +18,16 @@ let fileExists = fs.existsSync
 
 var localize
 var windowCloseCancelled
+var documentChanged = (saved, current) => saved !== current
 
-function isEdited(filepath, content) {
-	if(filepath && filepath != 'no-path') {
-		fs.readFile(filepath, function (err, data) {
+function isEdited(filePath, content) {
+	if(filePath && filePath != 'no-path') {
+		fs.readFile(filePath, function (err, data) {
 			if (err) {
 				return true; //if there's no file, it must have been changed
 			} else {
 				var savedContent = data.toString()
-				return content !== savedContent;
+				return documentChanged(savedContent, content)
 			}
 		});
 	}
@@ -43,7 +44,7 @@ let getParam = (win, param) => {
 // requests filename and content from current browser window
 function getFilepathAndContent(win, cb) {
 	ipcHelper.requestFromRenderer(win, 'filepath_content', function(event, results) {
-		cb(results.filepath, results.content)
+		cb(results.filePath, results.content)
 	})
 }
 
@@ -60,22 +61,22 @@ function userOpensHandler(callback) {
 				callback(null, null); //no content
 			}
 		},
-		filepath: function(callback) {
+		filePath: function(callback) {
 			dialog.showOpenDialog({
 				properties: ['openFile']
-			}, function(filepath) {
-				callback(null, filepath);
+			}, function(filePath) {
+				callback(null, filePath);
 			});
 		}
 	},
 	function (err, results) {
-		var filepath = results.filepath;
+		var filePath = results.filePath;
 		var currentContent = results.currentContent;
 
-		if(filepath) { // else user cancelled, do nothing
-			filepath = filepath.toString();
-			fs.readFile(filepath, function(err, openFileContent) {
-				callback(err, filepath, currentContent, openFileContent);
+		if(filePath) { // else user cancelled, do nothing
+			filePath = filePath.toString();
+			fs.readFile(filePath, function(err, openFileContent) {
+				callback(err, filePath, currentContent, openFileContent);
 			});
 		}
 	});
@@ -102,47 +103,47 @@ let genericSaveOrSaveAs = (type, ext, callback) => {
 	let translate = localize || id
 	
 	let win = BrowserWindow.getFocusedWindow()
-	getFilepathAndContent(win, function(filepath, content) {		
-		if (type === 'save-as' || !filepath) {
+	getFilepathAndContent(win, function(filePath, content) {		
+		if (type === 'save-as' || !filePath) {
 			dialog.showSaveDialog({
 				  filters: [
 						{name: 'OneModel', extensions: ['onemodel']},
 						{name: translate('All Files'), extensions: ['*']}
 				  ]
 				},
-				function(filepath) {
-					if(filepath) { //else user cancelled, do nothing
-						//send new filepath to renderer
+				function(filePath) {
+					if(filePath) { //else user cancelled, do nothing
+						//send new filePath to renderer
 					
-						if (path.extname(filepath).length == 0 && ext.length > 0) {
-							filepath = filepath + "." + ext
+						if (path.extname(filePath).length == 0 && ext.length > 0) {
+							filePath = filePath + "." + ext
 						}
 					
 						setImmediate(function() { //wait a tick so that dialog goes away and window focused again
 							let win = BrowserWindow.getFocusedWindow()
-							win.setRepresentedFilename(filepath)
-							win.setTitle(windowTitle(filepath))
-							win.filePath = filepath
-							win.webContents.send('set-filepath', filepath)
+							win.setRepresentedFilename(filePath)
+							win.setTitle(windowTitle(filePath))
+							win.filePath = filePath
+							win.webContents.send('set-filepath', filePath)
 						});
-						writeToFile(filepath, content, callback)
+						writeToFile(filePath, content, callback)
 					}
 					else {
-						if (callback) callback("User cancelled", filepath)
+						if (callback) callback("User cancelled", filePath)
 					}
 				}
 			)
 		} else {
-			writeToFile(filepath, content, callback)
+			writeToFile(filePath, content, callback)
 		}
 	});
 }
 
 let closeHandler = (ext, closed) => {
 	let win = BrowserWindow.getFocusedWindow()
-	getFilepathAndContent(win, function(filepath, content) {
-		if(filepath) {
-			resolveClose( isEdited(filepath, content), ext, content, closed)
+	getFilepathAndContent(win, function(filePath, content) {
+		if(filePath) {
+			resolveClose( isEdited(filePath, content), ext, content, closed)
 		} else {
 			resolveClose( (content !== ""), ext, content, closed)
 		}
@@ -150,9 +151,9 @@ let closeHandler = (ext, closed) => {
 }
 
 let closeWindow = (win, ext, performClose) => {
-	getFilepathAndContent(win, function(filepath, content) {
-		if(filepath) {
-			resolveClose( isEdited(filepath, content), ext, content, performClose)
+	getFilepathAndContent(win, function(filePath, content) {
+		if(filePath) {
+			resolveClose( isEdited(filePath, content), ext, content, performClose)
 		} else {
 			resolveClose( (content !== ""), ext, content, performClose)
 		}
@@ -199,12 +200,12 @@ let resolveClose = (edited, ext, content, performClose) => {
 	}
 }
 
-function writeToFile(filepath, content, callback) {
+function writeToFile(filePath, content, callback) {
 	if (typeof content !== "string") {
 		throw new TypeError("getContent must return a string")
 	}
-	fs.writeFile(filepath, content, function (err) {
-		callback(err, filepath)
+	fs.writeFile(filePath, content, function (err) {
+		callback(err, filePath)
 		if (err) {
 			console.log("Write failed: " + err);
 			return;
@@ -225,5 +226,8 @@ module.exports = {
 	fileIsEdited: isEdited,
 	windowCloseCancelled: (cancelled) => {
 		windowCloseCancelled = cancelled
+	},
+	setCompareDocument: (docChanged) => {
+		documentChanged = docChanged
 	}
 };

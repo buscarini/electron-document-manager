@@ -4,7 +4,7 @@ const electron = require('electron');
 const ipcRenderer = electron.ipcRenderer;
 const BrowserWindow = electron.remote.BrowserWindow;
 
-var filepath = null,
+var filePath = null,
     title = "Untitled",
     setContent = null,
     getContent = null,
@@ -19,21 +19,21 @@ ipcRenderer.on('request-content', function(event, callbackChannel) {
 	ipcRenderer.send(callbackChannel, getContent());
 });
 
-ipcRenderer.on('set-filepath', function(event, filepathArg, callbackChannel) {
-	filepath = filepathArg
+ipcRenderer.on('set-filepath', function(event, filePathArg, callbackChannel) {
+	filePath = filePathArg
 	if(callbackChannel) ipcRenderer.send(callbackChannel)
 });
 
-ipcRenderer.on('document_saved', function(event, filepathArg, callbackChannel) {
-	filepath = filepathArg
-	if (notifyDocSaved) notifyDocSaved(filepath)
+ipcRenderer.on('document_saved', function(event, filePathArg, callbackChannel) {
+	filePath = filePathArg
+	if (notifyDocSaved) notifyDocSaved(filePath)
 	if(callbackChannel) ipcRenderer.send(callbackChannel)	
 });
 
 
 ipcRenderer.on('request-filepath', function(event, callbackChannel) {
-	var path = filepath
-	if (filepath == null) {
+	var path = filePath
+	if (filePath == null) {
 		path = ""
 	}
 	ipcRenderer.send(callbackChannel, path);
@@ -43,11 +43,11 @@ ipcRenderer.on('request-filepath', function(event, callbackChannel) {
 // 	console.log("requesting properties")
 // 	let win = BrowserWindow.getFocusedWindow()
 // 	let bounds = win.getBounds()
-// 	ipcRenderer.send(callbackChannel, { filepath: filepath, x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height });
+// 	ipcRenderer.send(callbackChannel, { filePath: filePath, x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height });
 // });
 
 ipcRenderer.on('request-filepath_content', function(event, callbackChannel) {
-	ipcRenderer.send(callbackChannel, { filepath: filepath, content: getContent() });
+	ipcRenderer.send(callbackChannel, { filePath: filePath, content: getContent() });
 });
 
 

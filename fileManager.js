@@ -43,7 +43,10 @@ let getParam = (win, param) => {
 
 // requests filename and content from current browser window
 function getFilepathAndContent(win, cb) {
+	console.log("getFilepathAndContent " + win.id)
+	
 	ipcHelper.requestFromRenderer(win, 'filepath_content', function(event, results) {
+		console.log("got filepath and contents " + win.id + " " + JSON.stringify(results))
 		cb(results.filePath, results.content)
 	})
 }
@@ -139,11 +142,24 @@ let genericSaveOrSaveAs = (type, ext, callback) => {
 	});
 }
 
+let silentSave = (win, callback) => {
+	getFilepathAndContent(win, function(filePath, content) {
+		if (filePath) {
+			console.log("about to save to " + filePath)
+			writeToFile(filePath, content, callback)
+		}
+		else {
+			console.log("can't save, abort")
+			callback("Needs to ask to save")
+		}
+	})
+}
+
 let closeHandler = (ext, closed) => {
 	let win = BrowserWindow.getFocusedWindow()
 	getFilepathAndContent(win, function(filePath, content) {
 		if(filePath) {
-			resolveClose( isEdited(filePath, content), ext, content, closed)
+			writeToFile(filePath, content, closed)
 		} else {
 			resolveClose( (content !== ""), ext, content, closed)
 		}
@@ -152,6 +168,7 @@ let closeHandler = (ext, closed) => {
 
 let closeWindow = (win, ext, performClose) => {
 	getFilepathAndContent(win, function(filePath, content) {
+		console.log("got filepath and content " + filePath + " " + win.id)
 		if(filePath) {
 			resolveClose( isEdited(filePath, content), ext, content, performClose)
 		} else {
@@ -166,6 +183,8 @@ let resolveClose = (edited, ext, content, performClose) => {
 		We want to immediately save and close if: it has content but hasn't been edited
 		We want to ask if:                        it has been edited
 	*/
+	
+	console.log("resolve close. Edited " + edited)
 
 	let doClose = performClose ? performClose : id
 	
@@ -176,8 +195,14 @@ let resolveClose = (edited, ext, content, performClose) => {
 		performClose()
 		
 	} else if(!edited && content !== "") {
-		genericSaveOrSaveAs('save', ext, function() {
-			performClose()
+		genericSaveOrSaveAs('save', ext, function(err) {
+			if (err) {
+				console.log("Can't close window: Error saving. " + err)
+			}
+			else {
+				console.log("closing after saved")
+				performClose()
+			}
 		});
 	} else {		
 		// confirm with dialog
@@ -188,14 +213,21 @@ let resolveClose = (edited, ext, content, performClose) => {
 		});
 
 		if (button === 0) { //SAVE
-			genericSaveOrSaveAs('save', function() {
-				performClose()
+			genericSaveOrSaveAs('save', function(err) {
+				if (err) {
+					console.log("Can't close window: Error saving. " + err)
+				}
+				else {
+					console.log("closing after saved")
+					performClose()
+				}
 			});
 		} else if (button === 1) { //DISCARD
+			console.log("Discard save")			
 			performClose()
 		} else {
 			//CANCEL - do nothing
-			if (windowCloseCancelled) windowCloseCancelled()
+			console.log("cancel close")
 		}
 	}
 }
@@ -220,6 +252,7 @@ module.exports = {
 	openFile: userOpensHandler,
 	saveFile: userSavesHandler,
 	saveFileAs: userSaveAsHandler,
+	silentSave: silentSave,
 	fileExists: fileExists,
 	renameFile: null,
 	close: closeWindow,

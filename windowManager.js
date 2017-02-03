@@ -93,15 +93,24 @@ function createWindow(options) {
 //        event.returnValue = answer;
 //      });
 
+
 	win.on('close', function(e) {
+		console.log("close " + win.id + " " + filePath)
 		e.preventDefault()
 		
 		fileManager.close(win, ext, performClose => {
-			containers = _.filter(containers, container => container.id !== winId)
+			console.log("perform close " + win.id)
+			
+			containers = _.filter(containers, container => container.id !== win.id)
 			if (win) {
 				win.hide()
 				win.destroy()
 				win = null
+			}
+			
+			if (appIsQuitting && containers.length == 0) {
+				console.log("Try quitting again")
+				app.quit()
 			}
 		})
 	})
@@ -109,9 +118,9 @@ function createWindow(options) {
 	win.on('closed', function() {
 		containers = _.filter(containers, container => container.id !== winId)
 		
-		if (appIsQuitting && containers.length == 0) {
-			app.exit(0)
-		}
+		// if (appIsQuitting && containers.length == 0) {
+// 			app.exit(0)
+// 		}
 	})
 
 	win.on('move', () => onChange())

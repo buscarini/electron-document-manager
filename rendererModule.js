@@ -4,6 +4,14 @@ const electron = require('electron');
 const ipcRenderer = electron.ipcRenderer;
 const BrowserWindow = electron.remote.BrowserWindow;
 
+let win = BrowserWindow.getFocusedWindow() || { id: null }
+
+let winId = win.id
+
+console.log("Init renderer module " + winId)
+
+let requestId = name => "request-" + name
+
 var filePath = null,
     title = "Untitled",
     setContent = null,
@@ -15,23 +23,26 @@ ipcRenderer.on('set-content', function(event, content, callbackChannel) {
 	if(callbackChannel) ipcRenderer.send(callbackChannel);
 });
 
-ipcRenderer.on('request-content', function(event, callbackChannel) {
+ipcRenderer.on(requestId('content'), function(event, callbackChannel) {
 	ipcRenderer.send(callbackChannel, getContent());
 });
 
 ipcRenderer.on('set-filepath', function(event, filePathArg, callbackChannel) {
 	filePath = filePathArg
+	console.log("set filepath to " + filePath)
 	if(callbackChannel) ipcRenderer.send(callbackChannel)
 });
 
 ipcRenderer.on('document_saved', function(event, filePathArg, callbackChannel) {
 	filePath = filePathArg
+	console.log("set filepath to " + filePath)
+	
 	if (notifyDocSaved) notifyDocSaved(filePath)
 	if(callbackChannel) ipcRenderer.send(callbackChannel)	
 });
 
 
-ipcRenderer.on('request-filepath', function(event, callbackChannel) {
+ipcRenderer.on(requestId('filepath'), function(event, callbackChannel) {
 	var path = filePath
 	if (filePath == null) {
 		path = ""
@@ -46,7 +57,11 @@ ipcRenderer.on('request-filepath', function(event, callbackChannel) {
 // 	ipcRenderer.send(callbackChannel, { filePath: filePath, x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height });
 // });
 
-ipcRenderer.on('request-filepath_content', function(event, callbackChannel) {
+console.log(requestId('filepath_content'))
+ipcRenderer.on(requestId('filepath_content'), function(event, callbackChannel) {
+	
+	console.log("requested filepath and content: " + callbackChannel + " " + filePath)
+	
 	ipcRenderer.send(callbackChannel, { filePath: filePath, content: getContent() });
 });
 

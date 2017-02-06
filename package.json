@@ -19,6 +19,7 @@
     "async": "^1.5.2",
     "data.task": "^3.1.1",
     "electron-settings": "^2.2.2",
+	"key-path-helpers": "McPo/key-path-helpers#splitKeyPath-fix",
     "immutable": "^3.8.1",
     "immutable-ext": "^1.0.8",
     "lodash": "^4.0.0"

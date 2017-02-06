@@ -52,37 +52,29 @@ function getFilepathAndContent(win, cb) {
 }
 
 // OPEN get path to the file-to-open
-function userOpensHandler(callback) {
+function userOpensHandler(filePath) {
 	//check if already open
-	async.parallel({
-		currentContent: function(callback) {
-			if(BrowserWindow.getFocusedWindow()) {
-				ipcHelper.requestFromRenderer(BrowserWindow.getFocusedWindow(), 'content', function(event, currentContent) {
-					callback(null, currentContent);
-				});
-			} else {
-				callback(null, null); //no content
-			}
-		},
-		filePath: function(callback) {
+	if (!filePath || filePath.length === 0 ) {
+		return new Task((reject, resolve) => {
+			console.log("Show open dialog")	
 			dialog.showOpenDialog({
 				properties: ['openFile']
-			}, function(filePath) {
-				callback(null, filePath);
-			});
-		}
-	},
-	function (err, results) {
-		var filePath = results.filePath;
-		var currentContent = results.currentContent;
-
-		if(filePath) { // else user cancelled, do nothing
-			filePath = filePath.toString();
-			fs.readFile(filePath, function(err, openFileContent) {
-				callback(err, filePath, currentContent, openFileContent);
-			});
-		}
-	});
+			}, function(filePaths) {
+				console.log(filePaths)
+				
+				if (filePaths instanceof Array && filePaths[0]) {
+					resolve(filePaths[0])
+				}
+				else {
+					reject("Err: cancelled")
+				}
+			})
+		})
+	}
+	else {
+		console.log("Returning filepath " + filePath)
+		return Task.of(filePath)
+	}
 }
 
 // SAVE

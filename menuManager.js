@@ -20,7 +20,10 @@ function getMenuTemplate(options) {
 		console.log(doc.filePath)
 		return {
 			label: doc.filePath,
-			click: (item, focusedWindow) => options.openMethod(item, focusedWindow, doc.filePath)
+			click: (item, focusedWindow) => {
+				console.log("open " + doc.filePath)
+				options.openMethod(item, focusedWindow, null, doc.filePath)
+			}
 		}
 	})
 	

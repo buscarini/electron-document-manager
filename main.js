@@ -26,7 +26,7 @@ const preferences = pref.from({
 
 let settings = {
 	get: (k, cb) => {
-		cb(preferences.get(k))
+		cb(null, preferences.get(k))
 	},
 	set: (k,v, cb) => {
 		preferences.set(k, v)
@@ -36,6 +36,11 @@ let settings = {
 
 let readFileTask = path => {
 	return new Task((reject, resolve) => {
+		if (typeof path !== 'string' || path.length === 0) {
+			reject("Invalid path: " + path)
+			return
+		}
+		
 		fs.readFile(path, function(err, contents) {
 			if (err) {
 				reject(err)
@@ -90,7 +95,7 @@ let clearRecentDocs = () => {
 }
 
 let loadRecentDocs = (completion) => {
-	settings.get(recentFilesKey, docs => {
+	settings.get(recentFilesKey, (err, docs) => {
 		console.log("loaded docs " + JSON.stringify(docs))
 		let recents = _.filter(docs, x => x !== null)
 		console.log("recents " + JSON.stringify(recents))
@@ -125,19 +130,23 @@ let addRecentDoc = doc => {
 }
 
 let loadCurrentDocs = (completion) => {
+	console.log("load current docs")
 	settings.get(currentFilesKey, (err, data) => {
 		let current = _.filter(data, x => x !== null)
-		return _.defaultTo(current, [])		
+		completion(_.defaultTo(current, []))
 	})
 }
 
 let loadWindows = (windowManager, ext) => {
+	console.log("load windows")
 	loadCurrentDocs(docs => {
+		console.log("loaded current docs")
 		let recents = _.filter(docs, recent => typeof recent === 'object')
 		Immutable.fromJS(recents)
 			.map(prop => prop.toJS())
 			.traverse(Task.of, prop => createDocWindow(prop, windowManager, ext, () => saveWindows(windowManager)))
-			.fork(console.error, results => {			
+			.fork(console.error, results => {
+				console.log("create windows: " + results)
 				let windows = _.filter(results.toArray(), win => win != null)
 				if (windows.length === 0) {
 					windowManager.createWindow({ docExtension: ext })
@@ -208,8 +217,10 @@ let createDocWindow = (properties, windowManager, ext, onChange) => {
 // 			return win
 // 		}
 //
-		app.addRecentDocument(path)
-		addRecentDoc({ filePath: path })
+		if (typeof path === 'string') {
+			app.addRecentDocument(path)
+			addRecentDoc({ filePath: path })			
+		}
 		
 		return win
 	})
@@ -243,25 +254,26 @@ let menuOptions = (options, completion) => {
 		        windowManager.createWindow({ focusedWindow: focusedWindow, docExtension: ext });
 				saveWindows(windowManager)
 		      },
-		      openMethod: function(item, focusedWindow, filePath) {
-		        fileManager.openFile(function(err, filePath, currentFileContent, openFileContent) {
-		          //check if open in other window
-		          var windows = windowManager.getWindows();
+		      openMethod: function(item, focusedWindow, event, filePath) {
+  		        fileManager.openFile(filePath).fork(console.error, filePath => {
+    		          //check if open in other window
+    		          var windows = windowManager.getWindows();
 		  
-				  let winForFile = _.reduce(windows, (winForFile, win) =>  {
-						return (win.filePath === filePath) ? win : winForFile
-				  }, null)
+    				  let winForFile = _.reduce(windows, (winForFile, win) =>  {
+    						return (win.filePath === filePath) ? win : winForFile
+    				  }, null)
 
-				  if (winForFile) {
-					  winForFile.focus()
-				  }
-				  else {
-					  console.log("Creating doc for opened document")
-					  createDocWindow({ filePath: filePath }, windowManager, ext, () => saveWindows(windowManager))
-					  	.fork(id, id)
-				  }
-		        });
-		      },
+    				  if (winForFile) {
+    					  console.log("File already open. Focusing window")
+    					  winForFile.focus()
+    				  }
+    				  else {
+    					  console.log("Creating doc for opened document")
+    					  createDocWindow({ filePath: filePath }, windowManager, ext, () => saveWindows(windowManager))
+    					  	.fork(id, id)
+    				  } 	
+  		        })
+			  },			  
 		      saveMethod: function(item, focusedWindow) {
 		        fileManager.saveFile(ext, (err, path) => {
 		        	if (!err) {

@@ -5,7 +5,7 @@ const app = electron.app;  // Module to control application life.
 const BrowserWindow = electron.BrowserWindow;
 const async = require('async');
 const _ = require('lodash');
-const settings = require('electron-settings');
+const settings = require('electron-json-storage');
 
 const Immutable = require('immutable')
 const { List, Map } = require('immutable-ext')
@@ -52,34 +52,44 @@ let winPath = win => {
 	})
 }
 
+let logError = (err) => {
+	if (err) {
+		console.error(err)
+	}
+}
+
 let saveWindows = windowManager => {
 	loadProperties(windowManager)
 		.map(properties => {
-			settings.set(currentFilesKey, properties)
+			settings.set(currentFilesKey, properties, logError)
 			return properties
 		})
 		.fork(id, id)
 }
 
 let clearRecentDocs = () => {
-	settings.set(recentFilesKey, [])
+	settings.set(recentFilesKey, [], logError)
 }
 
-let loadRecentDocs = () => {
-	let docs = settings.getSync(recentFilesKey)
-	console.log("loaded docs " + JSON.stringify(docs))
-	let recents = _.filter(docs, x => x !== null)
-	console.log("recents " + JSON.stringify(recents))
-	return _.defaultTo(recents, [])
+let loadRecentDocs = (completion) => {
+	settings.get(recentFilesKey, docs => {
+		console.log("loaded docs " + JSON.stringify(docs))
+		let recents = _.filter(docs, x => x !== null)
+		console.log("recents " + JSON.stringify(recents))
+		completion(_.defaultTo(recents, []))
+	})
 }
 
 let saveRecentDocs = (docs) => {
 	console.log("saveRecentDocs " + JSON.stringify(docs))
-	settings.set(recentFilesKey, docs).then(() => {
-		console.log("update menu")
-		menuManager.updateMenu(menuOptions(userMenuOptions))
-	}, (err) => {
-		console.log("error saving recent docs " + err)
+	settings.set(recentFilesKey, docs, (err) => {
+		if (err) {
+			console.log("error saving recent docs " + err)
+		}
+		else {
+			console.log("update menu")
+			menuOptions(userMenuOptions, menuManager.updateMenu)
+		}
 	})
 }
 
@@ -89,28 +99,33 @@ let addRecentDoc = doc => {
 	loadProperties(windowManager)
 		.fork(console.error, properties => {
 			let docProps = _.filter(properties, prop => prop.filePath === doc.filePath)[0]
-			let recents = loadRecentDocs()
-			let newRecents = _.concat(recents, doc)
-			saveRecentDocs(newRecents)	
+			loadRecentDocs(recents => {
+				let newRecents = _.concat(recents, doc)
+				saveRecentDocs(newRecents)		
+			})
 		})
 }
 
-let loadCurrentDocs = () => {
-	let current = _.filter(settings.getSync(currentFilesKey), x => x !== null)
-	return _.defaultTo(current, [])
+let loadCurrentDocs = (completion) => {
+	settings.get(currentFilesKey, (err, data) => {
+		let current = _.filter(data, x => x !== null)
+		return _.defaultTo(current, [])		
+	})
 }
 
-let loadWindows = (windowManager, ext) => {	
-	let recents = _.filter(loadCurrentDocs(), recent => typeof recent === 'object')
-	Immutable.fromJS(recents)
-		.map(prop => prop.toJS())
-		.traverse(Task.of, prop => createDocWindow(prop, windowManager, ext, () => saveWindows(windowManager)))
-		.fork(console.error, results => {			
-			let windows = _.filter(results.toArray(), win => win != null)
-			if (windows.length === 0) {
-				windowManager.createWindow({ docExtension: ext })
-			}			
-		})
+let loadWindows = (windowManager, ext) => {
+	loadCurrentDocs(docs => {
+		let recents = _.filter(docs, recent => typeof recent === 'object')
+		Immutable.fromJS(recents)
+			.map(prop => prop.toJS())
+			.traverse(Task.of, prop => createDocWindow(prop, windowManager, ext, () => saveWindows(windowManager)))
+			.fork(console.error, results => {			
+				let windows = _.filter(results.toArray(), win => win != null)
+				if (windows.length === 0) {
+					windowManager.createWindow({ docExtension: ext })
+				}			
+			})
+	})
 }
 
 let createDocWindow = (properties, windowManager, ext, onChange) => {
@@ -198,61 +213,65 @@ let loadProperties = (windowManager, completion) => {
 	return Task.of(results)
 }
 
-let menuOptions = (options) => {
+let menuOptions = (options, completion) => {
 	console.log("menuOptions")
-	console.log(loadRecentDocs())
-
-	let ext = _.defaultTo(options.docExtension, "")
+	loadRecentDocs(docs => {
+		console.log(docs)
+		
+		let ext = _.defaultTo(options.docExtension, "")
 	
-	return {
-	      newMethod: function(item, focusedWindow) {
-	        windowManager.createWindow({ focusedWindow: focusedWindow, docExtension: ext });
-			saveWindows(windowManager)
-	      },
-	      openMethod: function(item, focusedWindow, filePath) {
-	        fileManager.openFile(function(err, filePath, currentFileContent, openFileContent) {
-	          //check if open in other window
-	          var windows = windowManager.getWindows();
+		let menu = {
+		      newMethod: function(item, focusedWindow) {
+		        windowManager.createWindow({ focusedWindow: focusedWindow, docExtension: ext });
+				saveWindows(windowManager)
+		      },
+		      openMethod: function(item, focusedWindow, filePath) {
+		        fileManager.openFile(function(err, filePath, currentFileContent, openFileContent) {
+		          //check if open in other window
+		          var windows = windowManager.getWindows();
 		  
-			  let winForFile = _.reduce(windows, (winForFile, win) =>  {
-					return (win.filePath === filePath) ? win : winForFile
-			  }, null)
+				  let winForFile = _.reduce(windows, (winForFile, win) =>  {
+						return (win.filePath === filePath) ? win : winForFile
+				  }, null)
 
-			  if (winForFile) {
-				  winForFile.focus()
-			  }
-			  else {
-				  console.log("Creating doc for opened document")
-				  createDocWindow({ filePath: filePath }, windowManager, ext, () => saveWindows(windowManager))
-				  	.fork(id, id)
-			  }
-	        });
-	      },
-	      saveMethod: function(item, focusedWindow) {
-	        fileManager.saveFile(ext, (err, path) => {
-	        	if (!err) {
-					focusedWindow.webContents.send('document_saved', path)
+				  if (winForFile) {
+					  winForFile.focus()
+				  }
+				  else {
+					  console.log("Creating doc for opened document")
+					  createDocWindow({ filePath: filePath }, windowManager, ext, () => saveWindows(windowManager))
+					  	.fork(id, id)
+				  }
+		        });
+		      },
+		      saveMethod: function(item, focusedWindow) {
+		        fileManager.saveFile(ext, (err, path) => {
+		        	if (!err) {
+						focusedWindow.webContents.send('document_saved', path)
 
-					addRecentDoc({filePath: path})
-	        	}
-	        })
-			saveWindows(windowManager)
-	      },
-	      saveAsMethod: function(item, focusedWindow) {
-	        fileManager.saveFileAs(ext)
-			saveWindows(windowManager)
-	      },
-	      renameMethod: function(item, focusedWindow) {
-	        //fileManager.renameFile();
-	        //to implement later
-	      },
-	      closeMethod: function(item, focusedWindow) {
-			  BrowserWindow.getFocusedWindow().close()
-	      },
-		  processMenu: options.processMenu,
-		  recentDocs: loadRecentDocs(),
-		  clearRecentDocs: clearRecentDocs
-	    }
+						addRecentDoc({filePath: path})
+		        	}
+		        })
+				saveWindows(windowManager)
+		      },
+		      saveAsMethod: function(item, focusedWindow) {
+		        fileManager.saveFileAs(ext)
+				saveWindows(windowManager)
+		      },
+		      renameMethod: function(item, focusedWindow) {
+		        //fileManager.renameFile();
+		        //to implement later
+		      },
+		      closeMethod: function(item, focusedWindow) {
+				  BrowserWindow.getFocusedWindow().close()
+		      },
+			  processMenu: options.processMenu,
+			  recentDocs: loadRecentDocs(),
+			  clearRecentDocs: clearRecentDocs
+		    }
+			
+		completion(menu)
+	})
 }
 
 
@@ -292,7 +311,7 @@ var initialize = function(options) {
 		  app.quit()
 		}
 		else {
-			menuManager.updateMenu(menuOptions(userMenuOptions))
+			menuOptions(userMenuOptions, menuManager.updateMenu)
 		}
 	});
 
@@ -312,7 +331,7 @@ var initialize = function(options) {
   app.on('ready', function() {
 	  
     //set up menu
-    menuManager.setMenu(menuOptions(userMenuOptions))
+	menuOptions(userMenuOptions, menuManager.setMenu)		
 	  
     //set up window menu updates - to be run on focus, blur, and window create
     // windowManager.setFocusUpdateHandler(() => menuManager.updateMenu(menuOptions(userMenuOptions)) )

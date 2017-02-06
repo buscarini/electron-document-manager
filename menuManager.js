@@ -9,13 +9,18 @@ function getMenuTemplate(options) {
 	
 	let separator = { type: 'separator' }
 	
-	let recentDocs = _.filter(options.recentDocs || [], doc => typeof doc.filepath === "string" && doc.filepath.length > 0)
+	console.log("menu template " + JSON.stringify(options.recentDocs))
+	
+	let recentDocs = _.filter(options.recentDocs || [], doc => typeof doc === "object" && doc.length > 0)
+
+	console.log("recent docs " + JSON.stringify(recentDocs))
+	
 	let recentDocsSubmenu = _.map(recentDocs, doc => {
 		console.log(doc)
-		console.log(doc.filepath)
+		console.log(doc.filePath)
 		return {
-			label: doc.filepath,
-			click: (item, focusedWindow) => options.openMethod(item, focusedWindow, doc.filepath)
+			label: doc.filePath,
+			click: (item, focusedWindow) => options.openMethod(item, focusedWindow, doc.filePath)
 		}
 	})
 	
@@ -270,6 +275,8 @@ var globalOptions = {};
 let id = a => { return a }
 
 function setMenu(options) {
+	console.log("set menu")
+	
   globalOptions = _.extend(globalOptions, options); //overwrite with later args
   var template = getMenuTemplate(globalOptions);
 
@@ -279,15 +286,13 @@ function setMenu(options) {
   Menu.setApplicationMenu(menu);
 }
 
-function updateMenu(processMenu) {
-	  let process = (processMenu === undefined || processMenu === null) ? id : processMenu
-	
-  setImmediate(function() { // electron bug - focused window is still defined on tick of blur event
-    setMenu({               // see https://github.com/atom/electron/issues/984
-      isFocusedWindow: !!BrowserWindow.getFocusedWindow(),
-		processMenu: process
-    });
-  });
+function updateMenu(options) {	
+	setImmediate(function() { // electron bug - focused window is still defined on tick of blur event
+		
+		options.isFocusedWindow = !!BrowserWindow.getFocusedWindow()// see https://github.com/atom/electron/issues/984
+		
+		setMenu(options)
+	});
 }
 
 module.exports = {

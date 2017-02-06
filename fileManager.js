@@ -20,16 +20,19 @@ var localize
 var windowCloseCancelled
 var documentChanged = (saved, current) => saved !== current
 
-function isEdited(filePath, content) {
+function isEdited(filePath, content, completion) {
 	if(filePath && filePath != 'no-path') {
 		fs.readFile(filePath, function (err, data) {
 			if (err) {
-				return true; //if there's no file, it must have been changed
+					completion(true) //if there's no file, it must have been changed
 			} else {
 				var savedContent = data.toString()
-				return documentChanged(savedContent, content)
+				completion(documentChanged(savedContent, content))
 			}
 		});
+	}
+	else {
+		completion(content !== "")
 	}
 }
 
@@ -43,10 +46,7 @@ let getParam = (win, param) => {
 
 // requests filename and content from current browser window
 function getFilepathAndContent(win, cb) {
-	console.log("getFilepathAndContent " + win.id)
-	
 	ipcHelper.requestFromRenderer(win, 'filepath_content', function(event, results) {
-		console.log("got filepath and contents " + win.id + " " + JSON.stringify(results))
 		cb(results.filePath, results.content)
 	})
 }
@@ -94,18 +94,21 @@ var returnedFilepathCallback = null;
 var returnedContentCallback = null;
 
 let userSavesHandler = (ext, callback) => {
-	genericSaveOrSaveAs('save', ext, callback)
+	let win = BrowserWindow.getFocusedWindow()
+	genericSaveOrSaveAs(win, 'save', ext, callback)
 }
 
 let userSaveAsHandler = (ext, callback) => {
-	genericSaveOrSaveAs('save-as', ext, callback)
+	let win = BrowserWindow.getFocusedWindow()
+	genericSaveOrSaveAs(win, 'save-as', ext, callback)
 }
 
-let genericSaveOrSaveAs = (type, ext, callback) => {
+let genericSaveOrSaveAs = (win, type, ext, callback) => {
 	
 	let translate = localize || id
 	
-	let win = BrowserWindow.getFocusedWindow()
+	console.log("generic save or save as " + win.id)
+	
 	getFilepathAndContent(win, function(filePath, content) {		
 		if (type === 'save-as' || !filePath) {
 			dialog.showSaveDialog({
@@ -161,23 +164,25 @@ let closeHandler = (ext, closed) => {
 		if(filePath) {
 			writeToFile(filePath, content, closed)
 		} else {
-			resolveClose( (content !== ""), ext, content, closed)
+			resolveClose(win, (content !== ""), ext, content, closed)
 		}
 	})
 }
 
-let closeWindow = (win, ext, performClose) => {
+let closeWindow = (win, ext, performClose, closeCancelled) => {
 	getFilepathAndContent(win, function(filePath, content) {
-		console.log("got filepath and content " + filePath + " " + win.id)
 		if(filePath) {
-			resolveClose( isEdited(filePath, content), ext, content, performClose)
+			isEdited(filePath,content, edited => {
+				resolveClose(win, edited, ext, content, performClose, closeCancelled)	
+			})
+			
 		} else {
-			resolveClose( (content !== ""), ext, content, performClose)
+			resolveClose(win, (content !== ""), ext, content, performClose, closeCancelled)
 		}
 	})
 }
 
-let resolveClose = (edited, ext, content, performClose) => {
+let resolveClose = (win, edited, ext, content, performClose, closeCancelled) => {
 	/*
 		We want to immediately close if:          it has no content and hasn't been edited
 		We want to immediately save and close if: it has content but hasn't been edited
@@ -195,7 +200,7 @@ let resolveClose = (edited, ext, content, performClose) => {
 		performClose()
 		
 	} else if(!edited && content !== "") {
-		genericSaveOrSaveAs('save', ext, function(err) {
+		genericSaveOrSaveAs(win, 'save', ext, function(err) {
 			if (err) {
 				console.log("Can't close window: Error saving. " + err)
 			}
@@ -213,7 +218,7 @@ let resolveClose = (edited, ext, content, performClose) => {
 		});
 
 		if (button === 0) { //SAVE
-			genericSaveOrSaveAs('save', function(err) {
+			genericSaveOrSaveAs(win, 'save', ext, function(err) {
 				if (err) {
 					console.log("Can't close window: Error saving. " + err)
 				}
@@ -228,6 +233,7 @@ let resolveClose = (edited, ext, content, performClose) => {
 		} else {
 			//CANCEL - do nothing
 			console.log("cancel close")
+			closeCancelled()
 		}
 	}
 }

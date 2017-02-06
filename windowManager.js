@@ -112,6 +112,8 @@ function createWindow(options) {
 				console.log("Try quitting again")
 				app.quit()
 			}
+		}, () => {
+			appIsQuitting = false
 		})
 	})
 	
@@ -176,5 +178,10 @@ module.exports = {
 	getWindows: function() { return _.map(containers, c => c.window) },
 	setQuitting: function(isQuitting) {
 		appIsQuitting = isQuitting
+	},
+	getWindowContainer: (win) => {
+		if (win === undefined || win === null) return null
+			
+		return _.find(containers, c => c.id === win.id)
 	}
 };

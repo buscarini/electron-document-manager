@@ -19,7 +19,10 @@ let { id } = require('./utils')
 
 var userMenuOptions = null
 
-const preferences = require('electron-pref');
+const pref = require('electron-pref')
+
+const preferences = pref.from({
+});
 
 let settings = {
 	get: (k, cb) => {
@@ -79,7 +82,11 @@ let saveWindows = windowManager => {
 }
 
 let clearRecentDocs = () => {
-	settings.set(recentFilesKey, [], logError)
+	settings.set(recentFilesKey, [], (err, data) => {
+		if (!err) {
+			menuOptions(userMenuOptions, menuManager.updateMenu)
+		}
+	})
 }
 
 let loadRecentDocs = (completion) => {
@@ -277,7 +284,7 @@ let menuOptions = (options, completion) => {
 				  BrowserWindow.getFocusedWindow().close()
 		      },
 			  processMenu: options.processMenu,
-			  recentDocs: loadRecentDocs(),
+			  recentDocs: docs,
 			  clearRecentDocs: clearRecentDocs
 		    }
 			

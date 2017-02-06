@@ -11,7 +11,7 @@ function getMenuTemplate(options) {
 	
 	console.log("menu template " + JSON.stringify(options.recentDocs))
 	
-	let recentDocs = _.filter(options.recentDocs || [], doc => typeof doc === "object" && doc.length > 0)
+	let recentDocs = _.uniqBy(_.filter(options.recentDocs || [], doc => typeof doc === "object" && doc.filePath.length > 0), "filePath")
 
 	console.log("recent docs " + JSON.stringify(recentDocs))
 	
@@ -31,7 +31,8 @@ function getMenuTemplate(options) {
 					click: event => {
 						let clear = options.clearRecentDocs || id
 						clear()
-					}
+					},
+					enabled: recentDocs.length > 0
 				}
 			])
 	

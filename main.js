@@ -5,7 +5,6 @@ const app = electron.app;  // Module to control application life.
 const BrowserWindow = electron.BrowserWindow;
 const async = require('async');
 const _ = require('lodash');
-const settings = require('electron-json-storage');
 
 const Immutable = require('immutable')
 const { List, Map } = require('immutable-ext')
@@ -19,6 +18,18 @@ let ipcHelper = require('./ipcHelper')
 let { id } = require('./utils')
 
 var userMenuOptions = null
+
+const preferences = require('electron-pref');
+
+let settings = {
+	get: (k, cb) => {
+		cb(preferences.get(k))
+	},
+	set: (k,v, cb) => {
+		preferences.set(k, v)
+		cb()
+	}
+}
 
 let readFileTask = path => {
 	return new Task((reject, resolve) => {

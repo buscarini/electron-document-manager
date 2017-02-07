@@ -19,20 +19,7 @@ let { id } = require('./utils')
 
 var userMenuOptions = null
 
-const pref = require('electron-pref')
-
-const preferences = pref.from({
-});
-
-let settings = {
-	get: (k, cb) => {
-		cb(null, preferences.get(k))
-	},
-	set: (k,v, cb) => {
-		preferences.set(k, v)
-		cb()
-	}
-}
+let { loadRecentDocs, saveRecentDocs, addRecentDoc, loadCurrentDocs, saveCurrentDocs } = require("./recentDocs")
 
 let readFileTask = path => {
 	return new Task((reject, resolve) => {
@@ -71,69 +58,28 @@ let winPath = win => {
 	})
 }
 
-let logError = (err) => {
-	if (err) {
-		console.error(err)
-	}
-}
-
 let saveWindows = windowManager => {
 	loadProperties(windowManager)
-		.map(properties => {
-			settings.set(currentFilesKey, properties, logError)
-			return properties
-		})
-		.fork(id, id)
-}
-
-let clearRecentDocs = () => {
-	settings.set(recentFilesKey, [], (err, data) => {
-		if (!err) {
-			menuOptions(userMenuOptions, menuManager.updateMenu)
-		}
-	})
-}
-
-let loadRecentDocs = (completion) => {
-	settings.get(recentFilesKey, (err, docs) => {
-		console.log("loaded docs " + JSON.stringify(docs))
-		let recents = _.filter(docs, x => x !== null)
-		console.log("recents " + JSON.stringify(recents))
-		completion(_.defaultTo(recents, []))
-	})
-}
-
-let saveRecentDocs = (docs) => {
-	console.log("saveRecentDocs " + JSON.stringify(docs))
-	settings.set(recentFilesKey, docs, (err) => {
-		if (err) {
-			console.log("error saving recent docs " + err)
-		}
-		else {
-			console.log("update menu")
-			menuOptions(userMenuOptions, menuManager.updateMenu)
-		}
-	})
-}
-
-let addRecentDoc = doc => {
-	console.log("add recent doc " + JSON.stringify(doc))
-	
-	loadProperties(windowManager)
-		.fork(console.error, properties => {
-			let docProps = _.filter(properties, prop => prop.filePath === doc.filePath)[0]
-			loadRecentDocs(recents => {
-				let newRecents = _.concat(recents, doc)
-				saveRecentDocs(newRecents)		
-			})
+		.fork(id, (properties) => {
+			saveCurrentDocs(properties)
 		})
 }
 
-let loadCurrentDocs = (completion) => {
-	console.log("load current docs")
-	settings.get(currentFilesKey, (err, data) => {
-		let current = _.filter(data, x => x !== null)
-		completion(_.defaultTo(current, []))
+let clearRecentDocuments = () => {
+	clearRecentDocs((err, data) => {
+		menuOptions(userMenuOptions, menuManager.updateMenu)
+	})
+}
+
+let saveRecentDocuments = (docs) => {
+	saveRecentDocs(docs, (err, data) => {
+		menuOptions(userMenuOptions, menuManager.updateMenu)
+	})
+}
+
+let addRecentDocument = (doc) => {
+	addRecentDoc(doc, () => {
+		menuOptions(userMenuOptions, menuManager.updateMenu)
 	})
 }
 
@@ -219,7 +165,7 @@ let createDocWindow = (properties, windowManager, ext, onChange) => {
 //
 		if (typeof path === 'string') {
 			app.addRecentDocument(path)
-			addRecentDoc({ filePath: path })			
+			addRecentDocument({ filePath: path })			
 		}
 		
 		return win
@@ -279,7 +225,7 @@ let menuOptions = (options, completion) => {
 		        	if (!err) {
 						focusedWindow.webContents.send('document_saved', path)
 
-						addRecentDoc({filePath: path})
+						addRecentDocument({filePath: path})
 		        	}
 		        })
 				saveWindows(windowManager)
@@ -297,7 +243,7 @@ let menuOptions = (options, completion) => {
 		      },
 			  processMenu: options.processMenu,
 			  recentDocs: docs,
-			  clearRecentDocs: clearRecentDocs
+			  clearRecentDocs: clearRecentDocuments
 		    }
 			
 		completion(menu)

@@ -192,7 +192,7 @@ let resolveClose = (win, edited, ext, content, performClose, closeCancelled) => 
 		performClose()
 		
 	} else if(!edited && content !== "") {
-		genericSaveOrSaveAs(win, 'save', ext, function(err) {
+		genericSaveOrSaveAs(win, 'save', ext, function(err, filePath) {
 			if (err) {
 				console.log("Can't close window: Error saving. " + err)
 			}
@@ -210,18 +210,18 @@ let resolveClose = (win, edited, ext, content, performClose, closeCancelled) => 
 		});
 
 		if (button === 0) { //SAVE
-			genericSaveOrSaveAs(win, 'save', ext, function(err) {
+			genericSaveOrSaveAs(win, 'save', ext, function(err, filePath) {
 				if (err) {
 					console.log("Can't close window: Error saving. " + err)
 				}
 				else {
 					console.log("closing after saved")
-					performClose()
+					performClose(filePath)
 				}
 			});
 		} else if (button === 1) { //DISCARD
 			console.log("Discard save")			
-			performClose()
+			performClose(null)
 		} else {
 			//CANCEL - do nothing
 			console.log("cancel close")

@@ -98,7 +98,7 @@ function createWindow(options) {
 		console.log("close " + win.id + " " + filePath)
 		e.preventDefault()
 		
-		fileManager.close(win, ext, performClose => {
+		fileManager.close(win, ext, (filePath) => {
 			console.log("perform close " + win.id)
 			
 			containers = _.filter(containers, container => container.id !== win.id)
@@ -117,13 +117,13 @@ function createWindow(options) {
 		})
 	})
 	
-	win.on('closed', function() {
-		containers = _.filter(containers, container => container.id !== winId)
-		
-		// if (appIsQuitting && containers.length == 0) {
-// 			app.exit(0)
-// 		}
-	})
+// 	win.on('closed', function() {
+// 		containers = _.filter(containers, container => container.id !== winId)
+//
+// 		// if (appIsQuitting && containers.length == 0) {
+// // 			app.exit(0)
+// // 		}
+// 	})
 
 	win.on('move', () => onChange())
 	win.on('resize', () => onChange())

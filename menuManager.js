@@ -4,6 +4,8 @@ const BrowserWindow = electron.BrowserWindow;
 const Menu = electron.Menu;
 const MenuItem = electron.MenuItem;
 const _ = require('lodash');
+const nodePath = require('path')
+
 
 function getMenuTemplate(options) {
 	
@@ -19,7 +21,7 @@ function getMenuTemplate(options) {
 		console.log(doc)
 		console.log(doc.filePath)
 		return {
-			label: doc.filePath,
+			label: nodePath.basename(doc.filePath),
 			click: (item, focusedWindow) => {
 				console.log("open " + doc.filePath)
 				options.openMethod(item, focusedWindow, null, doc.filePath)

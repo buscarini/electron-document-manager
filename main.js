@@ -58,6 +58,10 @@ let winPath = win => {
 	})
 }
 
+let updateMenu = () => {
+	menuOptions(userMenuOptions, menuManager.updateMenu)
+}
+
 let saveWindows = windowManager => {
 	loadProperties(windowManager)
 		.fork(id, (properties) => {
@@ -66,21 +70,15 @@ let saveWindows = windowManager => {
 }
 
 let clearRecentDocuments = () => {
-	clearRecentDocs((err, data) => {
-		menuOptions(userMenuOptions, menuManager.updateMenu)
-	})
+	clearRecentDocs(updateMenu)
 }
 
 let saveRecentDocuments = (docs) => {
-	saveRecentDocs(docs, (err, data) => {
-		menuOptions(userMenuOptions, menuManager.updateMenu)
-	})
+	saveRecentDocs(docs, updateMenu)
 }
 
 let addRecentDocument = (doc) => {
-	addRecentDoc(doc, () => {
-		menuOptions(userMenuOptions, menuManager.updateMenu)
-	})
+	addRecentDoc(doc, updateMenu)
 }
 
 let loadWindows = (windowManager, ext) => {
@@ -273,11 +271,15 @@ var initialize = function(options) {
 	
 	app.on('activate', function () {
 	  if (windowManager.getWindowContainers().length === 0) windowManager.createWindow({ docExtension: ext })
+	  updateMenu()
 	})
 	
 	app.on('before-quit', function() {
 		windowManager.setQuitting(true)
 	})
+	
+	app.on('browser-window-blur', updateMenu)
+	app.on('browser-window-focus', updateMenu)
 	
 	// Quit when all windows are closed.
 	app.on('window-all-closed', function() {
@@ -307,7 +309,7 @@ var initialize = function(options) {
   app.on('ready', function() {
 	  
     //set up menu
-	menuOptions(userMenuOptions, menuManager.setMenu)		
+	menuOptions(userMenuOptions, menuManager.setMenu)
 	  
     //set up window menu updates - to be run on focus, blur, and window create
     // windowManager.setFocusUpdateHandler(() => menuManager.updateMenu(menuOptions(userMenuOptions)) )

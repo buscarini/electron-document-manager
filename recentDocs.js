@@ -1,21 +1,24 @@
 'use strict';
 let _ = require('lodash');
+let Task = require('data.task')
 
 let { preferences } = require('./preferences')
-
-let logError = (err) => {
-	if (err) {
-		console.error(err)
-	}
-}
 
 let recentFilesKey = "document_recentFiles"
 let currentFilesKey = "document_currentFiles"
 
-let clearRecentDocs = (completion) => {
-	preferences.set(recentFilesKey, [], (err, data) => {
-		completion(err, data)
+let clearRecentDocs = () => {
+	return new Task((reject, resolve) => {
+		preferences.set(recentFilesKey, [], (err, data) => {
+			if (err) {
+				reject(err)
+			}
+			else {
+				resolve(data)
+			}
+		})			
 	})
+	
 }
 
 let cleanRecentDocs = docs => {
@@ -25,41 +28,72 @@ let cleanRecentDocs = docs => {
 }
 
 
-let loadRecentDocs = (completion) => {
-	preferences.get(recentFilesKey, (err, docs) => {
-		console.log("loaded docs " + JSON.stringify(docs))
-		let recents = _.filter(docs, x => x !== null)
-		console.log("recents " + JSON.stringify(recents))
-		completion(_.defaultTo(recents, []))
+let loadRecentDocs = () => {
+	return new Task((reject, resolve) => {
+		preferences.get(recentFilesKey, (err, docs) => {
+			console.log("loaded docs " + JSON.stringify(docs))
+			let recents = _.filter(docs, x => x !== null)
+			console.log("recents " + JSON.stringify(recents))
+			if (err) {
+				reject(err)
+			}
+			else {
+				resolve(_.defaultTo(recents, []))
+			}
+		})		
 	})
 }
 
-let saveRecentDocs = (docs, completion) => {
-	console.log("saveRecentDocs " + JSON.stringify(docs))
-	preferences.set(recentFilesKey, cleanRecentDocs(docs), (err) => {
-		completion(err)
+let saveRecentDocs = (docs) => {
+	return new Task((reject, resolve) => {
+		console.log("saveRecentDocs " + JSON.stringify(docs))
+		preferences.set(recentFilesKey, cleanRecentDocs(docs), (err) => {
+			if (err) {
+				reject(err)
+			}
+			else {
+				resolve()
+			}
+		})
+		
 	})
 }
 
-let addRecentDoc = (doc, completion) => {
-	console.log("add recent doc " + JSON.stringify(doc))
-
-	loadRecentDocs(recents => {
-		let newRecents = _.concat(recents, doc)
-		saveRecentDocs(newRecents, completion)
-	})
+let addRecentDoc = (doc) => {
+	console.log("add recent doc " + JSON.stringify(doc))	
+	
+	return loadRecentDocs()
+		.map(recents => _.concat(recents, doc))
+		.map(cleanRecentDocs)
+		.chain(saveRecentDocs)
 }
 
-let loadCurrentDocs = (completion) => {
+let loadCurrentDocs = () => {
 	console.log("load current docs")
-	preferences.get(currentFilesKey, (err, data) => {
-		let current = _.filter(data, x => x !== null)
-		completion(_.defaultTo(current, []))
-	})
+	return new Task((reject, resolve) => {
+		preferences.get(currentFilesKey, (err, current) => {
+			if (err) {
+				reject(err)
+			}
+			else {
+				resolve(_.defaultTo(current, []))
+			}
+		})		
+	}).map(docs => _.filter(docs, x => x !== null))
 }
 
 let saveCurrentDocs = (properties) => {
-	preferences.set(currentFilesKey, properties, logError)
+	return new Task((reject, resolve) => {
+		preferences.set(currentFilesKey, properties, err => {
+			if (err) {
+				console.error(err)
+				reject(err)
+			}
+			else {
+				resolve(properties)
+			}
+		})
+	})
 }
 
 module.exports = {
@@ -69,6 +103,4 @@ module.exports = {
 	loadCurrentDocs: loadCurrentDocs,
 	saveCurrentDocs: saveCurrentDocs
 }
-
-
 

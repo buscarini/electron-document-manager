@@ -5,9 +5,12 @@ let app = electron.app
 let BrowserWindow = electron.BrowserWindow
 let path = require('path')
 let _ = require('lodash')
-let { windowTitle } = require('./utils')
+let { id, windowTitle, readFileTask } = require('./utils')
+let Immutable = require('immutable')
+let Task = require('data.task')
 
 let fileManager = require('./fileManager')
+let { loadRecentDocs, saveRecentDocs, addRecentDoc, loadCurrentDocs, saveCurrentDocs } = require("./recentDocs")
 
 let Container = (win, path) => {
 	return {
@@ -138,7 +141,76 @@ function createWindow(options) {
 		win.webContents.openDevTools()
 	}
 	
+	
+	saveWindows()
+	
 	return win
+}
+
+let createDocumentWindow = (properties, ext, onChange) => {
+    //not open, do the rest of the stuff
+	let win = BrowserWindow.getFocusedWindow()
+	let path = properties.filePath
+	
+	let createWin = (path, contents) => {
+		return new Task((reject, resolve) => {
+		    fileManager.fileIsEdited(path, contents, isEdited => {
+			    if(win && !isEdited && contents === "") {
+					//open in current window
+					setUpWindow(win, filePath, contents)
+					resolve(win)
+			    } else {
+
+					let options = {
+						focusedWindow: win,
+						filePath: path,
+						fileContent: contents,
+						x: properties.x,
+						y: properties.y,
+						width: properties.width,
+						height: properties.height,
+						onChange: onChange,
+						docExtension: ext
+					}
+		
+					let newWin = createWindow(options)
+	  
+					if (onChange) onChange()
+				
+					resolve(newWin)
+			    }
+		    })
+		})
+	}
+	
+	var result = Task.of(null)
+ 	
+	if (path) {
+		result = readFileTask(path)
+			.chain(contents => createWin(path, contents))
+	}
+	else {
+		result = createWin(path, "")
+	}
+	
+	
+	console.log("created window for doc " + path)
+	
+	
+	return result.map(win => {
+		
+		saveWindows()
+		
+		console.log("adding doc to recents " + path)
+		
+		if (typeof path === 'string') {
+			app.addRecentDocument(path)
+		}
+		
+		addRecentDoc({ filePath: path })
+		
+		return win
+	})
 }
 
 function setUpWindow(win, filePath, contents) {
@@ -159,8 +231,51 @@ function setUpWindow(win, filePath, contents) {
 	}
 }
 
+let loadWindows = (ext) => {
+	console.log("load windows")
+	loadCurrentDocs()
+		.fork(console.error, docs => {	
+			console.log("loaded current docs")
+			let recents = _.filter(docs, recent => typeof recent === 'object')
+			Immutable.fromJS(recents)
+				.map(prop => prop.toJS())
+				.traverse(Task.of, prop => createDocumentWindow(prop, ext, () => saveWindows()))
+				.fork(console.error, results => {
+					console.log("create windows: " + results)
+					let windows = _.filter(results.toArray(), win => win != null)
+					if (windows.length === 0) {
+						createWindow({ docExtension: ext })
+					}			
+				})
+		})
+}
+
+let loadProperties = () => {
+	let results = _.map(containers, c => {
+		return {
+			filePath: c.filePath,
+			x: c.window.getBounds().x,
+			y: c.window.getBounds().y,
+			width: c.window.getBounds().width,
+			height: c.window.getBounds().height
+		}
+	})
+	
+	return Task.of(results)
+}
+
+let saveWindows = () => {
+	loadProperties()
+		.fork(console.error, (properties) => {
+			saveCurrentDocs(properties)
+		})
+}
+
+
 module.exports = {
 	createWindow: createWindow,
+	createDocumentWindow: createDocumentWindow,
+	
 	setUpWindow: setUpWindow,
 	//note: focus and blur handlers will only apply to future windows at creation
 	setFocusUpdateHandler: function(func) {
@@ -183,5 +298,8 @@ module.exports = {
 		if (win === undefined || win === null) return null
 			
 		return _.find(containers, c => c.id === win.id)
-	}
+	},
+	
+	saveWindows: saveWindows,
+	loadWindows: loadWindows
 };

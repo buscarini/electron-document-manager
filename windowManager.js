@@ -5,12 +5,13 @@ let app = electron.app
 let BrowserWindow = electron.BrowserWindow
 let path = require('path')
 let _ = require('lodash')
-let { id, windowTitle, readFileTask } = require('./utils')
+let { id, windowTitle, readFileTask, runTask } = require('./utils')
+
 let Immutable = require('immutable')
 let Task = require('data.task')
 
 let fileManager = require('./fileManager')
-let { loadRecentDocs, saveRecentDocs, addRecentDoc, loadCurrentDocs, saveCurrentDocs } = require("./recentDocs")
+let { loadRecentDocs, saveRecentDocs, addRecentDoc, loadCurrentDocs, saveCurrentDocs, updateCurrentDoc } = require("./recentDocs")
 
 let Container = (win, path) => {
 	return {
@@ -31,9 +32,7 @@ var focusUpdateHandler = null;
 
 function createWindow(options) {
 	options = options || {}
-	
-	let onChange = _.defaultTo(options.onChange, x => x)
-	
+		
 	let ext = options.docExtension || ".onemodel"
 
 	//pick a title (set as BrowserWindow.title and send with set-title)
@@ -104,6 +103,11 @@ function createWindow(options) {
 		fileManager.close(win, ext, (filePath) => {
 			console.log("perform close " + win.id)
 			
+			let doc = recentDocument(win, filePath)
+			updateCurrentDoc(doc)
+				.chain(addRecentDoc)
+				.fork(console.error, console.log)
+			
 			containers = _.filter(containers, container => container.id !== win.id)
 			if (win) {
 				win.hide()
@@ -128,8 +132,8 @@ function createWindow(options) {
 // // 		}
 // 	})
 
-	win.on('move', () => onChange())
-	win.on('resize', () => onChange())
+	win.on('move', () => saveWindows())
+	win.on('resize', () => saveWindows())
 
 	if(focusUpdateHandler) {
 		focusUpdateHandler();
@@ -147,7 +151,7 @@ function createWindow(options) {
 	return win
 }
 
-let createDocumentWindow = (properties, ext, onChange) => {
+let createDocumentWindow = (properties, ext) => {
     //not open, do the rest of the stuff
 	let win = BrowserWindow.getFocusedWindow()
 	let path = properties.filePath
@@ -169,14 +173,11 @@ let createDocumentWindow = (properties, ext, onChange) => {
 						y: properties.y,
 						width: properties.width,
 						height: properties.height,
-						onChange: onChange,
 						docExtension: ext
 					}
 		
 					let newWin = createWindow(options)
-	  
-					if (onChange) onChange()
-				
+	  			
 					resolve(newWin)
 			    }
 		    })
@@ -197,20 +198,18 @@ let createDocumentWindow = (properties, ext, onChange) => {
 	console.log("created window for doc " + path)
 	
 	
-	return result.map(win => {
+	return result
+			.chain(win => {		
+				saveWindows()
 		
-		saveWindows()
+				console.log("Before add recent doc. Path: " + path)
 		
-		console.log("adding doc to recents " + path)
-		
-		if (typeof path === 'string') {
-			app.addRecentDocument(path)
-		}
-		
-		addRecentDoc({ filePath: path })
-		
-		return win
-	})
+				if (typeof path === 'string') {
+					return addRecentDoc(recentDocument(win, path))
+				}
+
+				return Task.of(win)
+			})
 }
 
 function setUpWindow(win, filePath, contents) {
@@ -239,7 +238,7 @@ let loadWindows = (ext) => {
 			let recents = _.filter(docs, recent => typeof recent === 'object')
 			Immutable.fromJS(recents)
 				.map(prop => prop.toJS())
-				.traverse(Task.of, prop => createDocumentWindow(prop, ext, () => saveWindows()))
+				.traverse(Task.of, prop => createDocumentWindow(prop, ext))
 				.fork(console.error, results => {
 					console.log("create windows: " + results)
 					let windows = _.filter(results.toArray(), win => win != null)
@@ -250,15 +249,29 @@ let loadWindows = (ext) => {
 		})
 }
 
+let recentDocumentForWin = win => {
+	return {
+			id: win.id,
+			x: win.getBounds().x,
+			y: win.getBounds().y,
+			width: win.getBounds().width,
+			height: win.getBounds().height
+	}
+}
+
+let recentDocumentForPath = path => {
+	return {
+		filePath: path
+	}
+}
+
+let recentDocument = (win, path) => {
+	return Object.assign(recentDocumentForWin(win), recentDocumentForPath(path))
+}
+
 let loadProperties = () => {
 	let results = _.map(containers, c => {
-		return {
-			filePath: c.filePath,
-			x: c.window.getBounds().x,
-			y: c.window.getBounds().y,
-			width: c.window.getBounds().width,
-			height: c.window.getBounds().height
-		}
+		return recentDocument(c.window, c.filePath)		
 	})
 	
 	return Task.of(results)
@@ -266,9 +279,8 @@ let loadProperties = () => {
 
 let saveWindows = () => {
 	loadProperties()
-		.fork(console.error, (properties) => {
-			saveCurrentDocs(properties)
-		})
+		.chain(saveCurrentDocs)
+		.fork(console.error, console.log)
 }
 
 

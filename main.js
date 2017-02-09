@@ -18,7 +18,7 @@ let { id, runTaskF, runTask, readFileTask } = require('./utils')
 
 var userMenuOptions = null
 
-let { loadRecentDocs, saveRecentDocs, addRecentDoc, loadCurrentDocs, saveCurrentDocs } = require("./recentDocs")
+let { loadRecentDocs, addRecentDoc, loadCurrentDocs } = require("./recentDocs")
 
 var processMenu = null
 
@@ -44,20 +44,8 @@ let updateMenu = () => {
 				.map(menuManager.updateMenu)
 }
 
-// let saveWindows = windowManager => {
-// 	loadProperties(windowManager)
-// 		.fork(id, (properties) => {
-// 			saveCurrentDocs(properties)
-// 		})
-// }
-
 let clearRecentDocuments = () => {
 	return clearRecentDocs()
-		.chain(updateMenu)
-}
-
-let saveRecentDocuments = (docs) => {
-	return saveRecentDocs(docs)
 		.chain(updateMenu)
 }
 
@@ -66,118 +54,11 @@ let addRecentDocument = (doc) => {
 		.chain(updateMenu)
 }
 
-// let loadWindows = (windowManager, ext) => {
-// 	console.log("load windows")
-// 	loadCurrentDocs(docs => {
-// 		console.log("loaded current docs")
-// 		let recents = _.filter(docs, recent => typeof recent === 'object')
-// 		Immutable.fromJS(recents)
-// 			.map(prop => prop.toJS())
-// 			.traverse(Task.of, prop => createDocWindow(prop, windowManager, ext, () => saveWindows(windowManager)))
-// 			.fork(console.error, results => {
-// 				console.log("create windows: " + results)
-// 				let windows = _.filter(results.toArray(), win => win != null)
-// 				if (windows.length === 0) {
-// 					windowManager.createWindow({ docExtension: ext })
-// 				}
-// 			})
-// 	})
-// }
-
-// let createDocWindow = (properties, windowManager, ext, onChange) => {
-//     //not open, do the rest of the stuff
-// 	let win = BrowserWindow.getFocusedWindow()
-// 	let path = properties.filePath
-//
-// 	let createWin = (path, contents) => {
-// 		return new Task((reject, resolve) => {
-// 		    fileManager.fileIsEdited(path, contents, isEdited => {
-// 			    if(win && !isEdited && contents === "") {
-// 					//open in current window
-// 					windowManager.setUpWindow(win, filePath, contents)
-// 					resolve(win)
-// 			    } else {
-//
-// 					let options = {
-// 						focusedWindow: win,
-// 						filePath: path,
-// 						fileContent: contents,
-// 						x: properties.x,
-// 						y: properties.y,
-// 						width: properties.width,
-// 						height: properties.height,
-// 						onChange: onChange,
-// 						docExtension: ext
-// 					}
-//
-// 					let newWin = windowManager.createWindow(options)
-//
-// 					if (onChange) onChange()
-//
-// 					resolve(newWin)
-// 			    }
-// 		    })
-// 		})
-// 	}
-//
-// 	var result = Task.of(null)
-//
-// 	if (path) {
-// 		result = readFileTask(path)
-// 			.chain(contents => createWin(path, contents))
-// 	}
-// 	else {
-// 		result = createWin(path, "")
-// 	}
-//
-//
-// 	console.log("created window for doc " + path)
-//
-//
-// 	return result.map(win => {
-//
-// 		saveWindows(windowManager)
-//
-// 		console.log("adding doc to recents " + path)
-//
-// 		// let container = windowManager.getWindowContainer(win)
-// // 		if (container === undefined || container === null) {
-// // 			console.log("no container for " + win.id)
-// // 			return win
-// // 		}
-// //
-// 		if (typeof path === 'string') {
-// 			app.addRecentDocument(path)
-// 			addRecentDocument({ filePath: path })
-// 		}
-//
-// 		return win
-// 	})
-// }
-
-// let loadProperties = (windowManager, completion) => {
-//     var containers = windowManager.getWindowContainers()
-//
-// 	let results = _.map(containers, c => {
-// 		return {
-// 			filePath: c.filePath,
-// 			x: c.window.getBounds().x,
-// 			y: c.window.getBounds().y,
-// 			width: c.window.getBounds().width,
-// 			height: c.window.getBounds().height
-// 		}
-// 	})
-//
-// 	return Task.of(results)
-// }
-
 let createMenuOptions = (options) => {
 	console.log("menuOptions")
 	
 	return loadRecentDocs()
-		.map(docs => {
-			console.log(docs)
-		
+		.map(docs => {		
 			let ext = _.defaultTo(options.docExtension, "")
 	
 			let menu = {
@@ -199,12 +80,10 @@ let createMenuOptions = (options) => {
 	    				  }
 	    				  else {
 	    					  console.log("Creating doc for opened document")
-	    					  windowManager.createDocumentWindow({ filePath: filePath }, ext, () => {
-								  runTask(addRecentDocument({ filePath: path }))
-								  windowManager.saveWindows()
-							  })
-	    					  	.fork(id, id)
-	    				  } 	
+	    					  windowManager.createDocumentWindow({ filePath: filePath }, ext, windowManager.saveWindows)
+								  .chain(updateMenu)
+		    					  	.fork(console.error, console.log)
+	    				  }
 	  		        })
 				  },
 			      saveMethod: function(item, focusedWindow) {
@@ -280,18 +159,13 @@ var initialize = function(options) {
 		else {
 			runTask(updateMenu())
 		}
-	});
-
-	//   app.on('open-file', function(e, filePath) {
-	//   console.log("open file")
-	// app.addRecentDocument(filePath);
-	//
-	// createDocWindow({ filePath: filePath }, windowManager, ext, () => saveWindows(windowManager)).fork(id, id)
-	//
-	// addRecentDoc({ filePath: filePath })
-	//
-	// saveWindows(windowManager)
-	//   });
+	})
+	
+	app.on('open-file', function(e, filePath) {		
+		windowManager.createDocumentWindow({ filePath: filePath }, ext)
+			.chain(updateMenu)
+			.fork(console.error, console.log)
+	})
 
   // This method will be called when Electron has finished
   // initialization and is ready to create browser windows.

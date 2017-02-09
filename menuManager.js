@@ -10,16 +10,10 @@ const nodePath = require('path')
 function getMenuTemplate(options) {
 	
 	let separator = { type: 'separator' }
-	
-	console.log("menu template " + JSON.stringify(options.recentDocs))
-	
+		
 	let recentDocs = _.uniqBy(_.filter(options.recentDocs || [], doc => typeof doc === "object" && doc.filePath.length > 0), "filePath")
-
-	console.log("recent docs " + JSON.stringify(recentDocs))
 	
 	let recentDocsSubmenu = _.map(recentDocs, doc => {
-		console.log(doc)
-		console.log(doc.filePath)
 		return {
 			label: nodePath.basename(doc.filePath),
 			click: (item, focusedWindow) => {
@@ -281,8 +275,6 @@ var globalOptions = {};
 let id = a => { return a }
 
 function setMenu(options) {
-	console.log("set menu")
-	
   globalOptions = _.extend(globalOptions, options); //overwrite with later args
   var template = getMenuTemplate(globalOptions);
 

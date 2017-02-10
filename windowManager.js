@@ -2,11 +2,12 @@
 
 const electron = require("electron")
 const app = electron.app
+const R = require("ramda")
 const BrowserWindow = electron.BrowserWindow
 const _ = require("lodash")
 const { windowTitle, readFileTask, runTask } = require("./utils")
 
-const Immutable = require("immutable")
+const Immutable = require("immutable-ext")
 const Task = require("data.task")
 
 const fileManager = require("./fileManager")
@@ -87,10 +88,6 @@ function createWindow(options) {
 			if (appIsQuitting) {
 				runTask(updateCurrentDoc(doc))
 			}
-			else {
-				saveWindows()
-			}
-		
 			
 			containers = _.filter(containers, container => container.id !== win.id)
 			if (win) {
@@ -103,6 +100,11 @@ function createWindow(options) {
 				console.log("Try quitting again")
 				app.quit()
 			}
+			
+			if (!appIsQuitting) {
+				saveWindows()
+			}
+			
 		}, () => {
 			appIsQuitting = false
 		})
@@ -217,6 +219,7 @@ function setUpWindow(win, filePath, contents) {
 const loadWindows = (ext) => {
 	console.log("load windows")
 	loadCurrentDocs()
+		.map(R.reverse)
 		.fork(console.error, docs => {	
 			console.log("loaded current docs")
 			const recents = _.filter(docs, recent => typeof recent === "object")

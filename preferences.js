@@ -1,12 +1,10 @@
-'use strict';
-const _ = require('lodash');
+"use strict"
 
-const pref = require('electron-pref')
+const pref = require("electron-pref")
 
-const preferences = pref.from({
-});
+const preferences = pref.from({})
 
-let settings = {
+const settings = {
 	get: (k, cb) => {
 		cb(null, preferences.get(k))
 	},

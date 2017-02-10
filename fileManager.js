@@ -1,52 +1,40 @@
-'use strict';
+"use strict"
 
-const electron = require('electron');
-const dialog = electron.dialog;
-const BrowserWindow = electron.BrowserWindow;
-const path = require('path');
-const async = require('async');
-const ipcHelper = require('./ipcHelper');
-const { windowTitle, id } = require('./utils')
+const electron = require("electron")
+const dialog = electron.dialog
+const BrowserWindow = electron.BrowserWindow
+const path = require("path")
+const ipcHelper = require("./ipcHelper")
+const { windowTitle, id } = require("./utils")
 
-var fs = require("fs");
+var fs = require("fs")
 
-const Immutable = require('immutable')
-const { List, Map } = require('immutable-ext')
-const Task = require('data.task')
+const Task = require("data.task")
 
-let fileExists = fs.existsSync
+const fileExists = fs.existsSync
 
 var localize
-var windowCloseCancelled
 var documentChanged = (saved, current) => saved !== current
 
 function isEdited(filePath, content, completion) {
-	if(filePath && filePath != 'no-path') {
+	if(filePath && filePath != "no-path") {
 		fs.readFile(filePath, function (err, data) {
 			if (err) {
-					completion(true) //if there's no file, it must have been changed
+					completion(true) //if there"s no file, it must have been changed
 			} else {
 				var savedContent = data.toString()
 				completion(documentChanged(savedContent, content))
 			}
-		});
+		})
 	}
 	else {
 		completion(content !== "")
 	}
 }
 
-let getParam = (win, param) => {
-	return new Task(function(reject, resolve) {
-		ipcHelper.requestFromRenderer(win, param, function(event, data) {
-			resolve(data)
-		})
-	})
-}
-
 // requests filename and content from current browser window
 function getFilepathAndContent(win, cb) {
-	ipcHelper.requestFromRenderer(win, 'filepath_content', function(event, results) {
+	ipcHelper.requestFromRenderer(win, "filepath_content", function(event, results) {
 		cb(results.filePath, results.content)
 	})
 }
@@ -58,7 +46,7 @@ function userOpensHandler(filePath) {
 		return new Task((reject, resolve) => {
 			console.log("Show open dialog")	
 			dialog.showOpenDialog({
-				properties: ['openFile']
+				properties: ["openFile"]
 			}, function(filePaths) {
 				console.log(filePaths)
 				
@@ -78,36 +66,33 @@ function userOpensHandler(filePath) {
 }
 
 // SAVE
-// 		if no path, call dialog window
-// 		otherwise save to path
-var isSaveAs;
 
-var returnedFilepathCallback = null;
-var returnedContentCallback = null;
 
-let userSavesHandler = (ext, callback) => {
-	let win = BrowserWindow.getFocusedWindow()
-	genericSaveOrSaveAs(win, 'save', ext, callback)
+
+
+const userSavesHandler = (ext, callback) => {
+	const win = BrowserWindow.getFocusedWindow()
+	genericSaveOrSaveAs(win, "save", ext, callback)
 }
 
-let userSaveAsHandler = (ext, callback) => {
-	let win = BrowserWindow.getFocusedWindow()
-	genericSaveOrSaveAs(win, 'save-as', ext, callback)
+const userSaveAsHandler = (ext, callback) => {
+	const win = BrowserWindow.getFocusedWindow()
+	genericSaveOrSaveAs(win, "save-as", ext, callback)
 }
 
-let genericSaveOrSaveAs = (win, type, ext, callback) => {
+const genericSaveOrSaveAs = (win, type, ext, callback) => {
 	
-	let translate = localize || id
+	const translate = localize || id
 	
 	console.log("generic save or save as " + win.id)
 	
 	getFilepathAndContent(win, function(filePath, content) {		
-		if (type === 'save-as' || !filePath) {
+		if (type === "save-as" || !filePath) {
 			dialog.showSaveDialog({
-				  filters: [
-						{name: 'OneModel', extensions: ['onemodel']},
-						{name: translate('All Files'), extensions: ['*']}
-				  ]
+					filters: [
+						{name: "OneModel", extensions: ["onemodel"]},
+						{name: translate("All Files"), extensions: ["*"]}
+					]
 				},
 				function(filePath) {
 					if(filePath) { //else user cancelled, do nothing
@@ -118,12 +103,12 @@ let genericSaveOrSaveAs = (win, type, ext, callback) => {
 						}
 					
 						setImmediate(function() { //wait a tick so that dialog goes away and window focused again
-							let win = BrowserWindow.getFocusedWindow()
+							const win = BrowserWindow.getFocusedWindow()
 							win.setRepresentedFilename(filePath)
 							win.setTitle(windowTitle(filePath))
 							win.filePath = filePath
-							win.webContents.send('set-filepath', filePath)
-						});
+							win.webContents.send("set-filepath", filePath)
+						})
 						writeToFile(filePath, content, callback)
 					}
 					else {
@@ -134,10 +119,10 @@ let genericSaveOrSaveAs = (win, type, ext, callback) => {
 		} else {
 			writeToFile(filePath, content, callback)
 		}
-	});
+	})
 }
 
-let silentSave = (win, callback) => {
+const silentSave = (win, callback) => {
 	getFilepathAndContent(win, function(filePath, content) {
 		if (filePath) {
 			console.log("about to save to " + filePath)
@@ -150,18 +135,7 @@ let silentSave = (win, callback) => {
 	})
 }
 
-let closeHandler = (ext, closed) => {
-	let win = BrowserWindow.getFocusedWindow()
-	getFilepathAndContent(win, function(filePath, content) {
-		if(filePath) {
-			writeToFile(filePath, content, closed)
-		} else {
-			resolveClose(win, (content !== ""), ext, content, closed)
-		}
-	})
-}
-
-let closeWindow = (win, ext, performClose, closeCancelled) => {
+const closeWindow = (win, ext, performClose, closeCancelled) => {
 	getFilepathAndContent(win, function(filePath, content) {
 		if(filePath) {
 			isEdited(filePath,content, edited => {
@@ -174,25 +148,23 @@ let closeWindow = (win, ext, performClose, closeCancelled) => {
 	})
 }
 
-let resolveClose = (win, edited, ext, content, performClose, closeCancelled) => {
+const resolveClose = (win, edited, ext, content, performClose, closeCancelled) => {
 	/*
-		We want to immediately close if:          it has no content and hasn't been edited
-		We want to immediately save and close if: it has content but hasn't been edited
+		We want to immediately close if:          it has no content and hasn"t been edited
+		We want to immediately save and close if: it has content but hasn"t been edited
 		We want to ask if:                        it has been edited
 	*/
 	
 	console.log("resolve close. Edited " + edited)
-
-	let doClose = performClose ? performClose : id
 	
-	let translate = localize || id
+	const translate = localize || id
 
 	if(!edited && content === "") {
 		// BrowserWindow.getFocusedWindow().close()
 		performClose()
 		
 	} else if(!edited && content !== "") {
-		genericSaveOrSaveAs(win, 'save', ext, function(err, filePath) {
+		genericSaveOrSaveAs(win, "save", ext, function(err, filePath) {
 			if (err) {
 				console.log("Can't close window: Error saving. " + err)
 			}
@@ -200,17 +172,17 @@ let resolveClose = (win, edited, ext, content, performClose, closeCancelled) => 
 				console.log("closing after saved")
 				performClose()
 			}
-		});
+		})
 	} else {		
 		// confirm with dialog
 		var button = dialog.showMessageBox({
 			type: "question",
 			buttons: [ translate("Save changes"), translate("Discard changes"), translate("Cancel")],
 			message: translate("Your file was changed since saving the last time. Do you want to save before closing?")
-		});
+		})
 
 		if (button === 0) { //SAVE
-			genericSaveOrSaveAs(win, 'save', ext, function(err, filePath) {
+			genericSaveOrSaveAs(win, "save", ext, function(err, filePath) {
 				if (err) {
 					console.log("Can't close window: Error saving. " + err)
 				}
@@ -218,7 +190,7 @@ let resolveClose = (win, edited, ext, content, performClose, closeCancelled) => 
 					console.log("closing after saved")
 					performClose(filePath)
 				}
-			});
+			})
 		} else if (button === 1) { //DISCARD
 			console.log("Discard save")			
 			performClose(null)
@@ -237,10 +209,10 @@ function writeToFile(filePath, content, callback) {
 	fs.writeFile(filePath, content, function (err) {
 		callback(err, filePath)
 		if (err) {
-			console.log("Write failed: " + err);
-			return;
+			console.log("Write failed: " + err)
+			return
 		}
-	});
+	})
 }
 
 module.exports = {
@@ -255,10 +227,7 @@ module.exports = {
 	renameFile: null,
 	close: closeWindow,
 	fileIsEdited: isEdited,
-	windowCloseCancelled: (cancelled) => {
-		windowCloseCancelled = cancelled
-	},
 	setCompareDocument: (docChanged) => {
 		documentChanged = docChanged
 	}
-};
+}

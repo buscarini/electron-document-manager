@@ -1,19 +1,18 @@
-'use strict';
+"use strict"
 
-let electron = require('electron')
-let app = electron.app
-let BrowserWindow = electron.BrowserWindow
-let path = require('path')
-let _ = require('lodash')
-let { id, windowTitle, readFileTask, runTask } = require('./utils')
+const electron = require("electron")
+const app = electron.app
+const BrowserWindow = electron.BrowserWindow
+const _ = require("lodash")
+const { windowTitle, readFileTask, runTask } = require("./utils")
 
-let Immutable = require('immutable')
-let Task = require('data.task')
+const Immutable = require("immutable")
+const Task = require("data.task")
 
-let fileManager = require('./fileManager')
-let { loadRecentDocs, saveRecentDocs, addRecentDoc, loadCurrentDocs, saveCurrentDocs, updateCurrentDoc } = require("./recentDocs")
+const fileManager = require("./fileManager")
+const { addRecentDoc, loadCurrentDocs, saveCurrentDocs, updateCurrentDoc } = require("./recentDocs")
 
-let Container = (win, path) => {
+const Container = (win, path) => {
 	return {
 		window: win,
 		id: win.id,
@@ -22,21 +21,20 @@ let Container = (win, path) => {
 }
 
 var containers = []
-var untitledIndex = 1;
+var untitledIndex = 1
 var indexFile
-var shouldCloseWindow
 var openDevTools
 var appIsQuitting = false
 
-var focusUpdateHandler = null;
+var focusUpdateHandler = null
 
 function createWindow(options) {
 	options = options || {}
 		
-	let ext = options.docExtension || ".onemodel"
+	const ext = options.docExtension || ".onemodel"
 
 	//pick a title (set as BrowserWindow.title and send with set-title)
-	var title = options.filePath ? windowTitle(options.filePath) : ( "Untitled " + untitledIndex++ );
+	var title = options.filePath ? windowTitle(options.filePath) : ( "Untitled " + untitledIndex++ )
 
 	var parameters = {
 		x: _.defaultTo(options.x, null),
@@ -44,69 +42,55 @@ function createWindow(options) {
 		width: _.defaultTo(options.width, 900),
 		height: _.defaultTo(options.height, 600),
 		title: title
-	};
+	}
 
 	if(options.focusedWindow) {
-		var bounds = options.focusedWindow.getBounds();
+		var bounds = options.focusedWindow.getBounds()
 		parameters = _.extend(parameters, {
 			x: bounds.x + 20,
 			y: bounds.y + 20
-		});
+		})
 	}
 
 	parameters = _.extend(parameters, { show: false })
 
 	// Create the browser window.
 	var win = null
-	win = new BrowserWindow(parameters);
-	win.once('ready-to-show', () => {
-	  win.show()
+	win = new BrowserWindow(parameters)
+	win.once("ready-to-show", () => {
+		win.show()
 	})
 	
-	let container = Container(win, options.filePath, options.tmpPath)
+	const container = Container(win, options.filePath, options.tmpPath)
 	containers.push(container)
 
 	// and load the index.html of the app.
 	win.loadURL(indexFile)
 
-	win.webContents.on('did-finish-load', function() {
-		setUpWindow(win, options.filePath, options.fileContent);
-	});
+	win.webContents.on("did-finish-load", function() {
+		setUpWindow(win, options.filePath, options.fileContent)
+	})
 	
-	let filePath = options.filePath
+	const filePath = options.filePath
 
-	let winId = win.id
-
-
-	// win.on('close', (e) => {
-// 		if (shouldCloseWindow()) e.preventDefault()
-// 	})
-		//
-	// win.onbeforeunload = (e) => {
-	// 	console.log('I do not want to be closed')
-	// 	// if () e.preventDefault()
-	// 	// e.returnValue = shouldCloseWindow()
-	// 	e.returnValue = false
-	// 	return false
-	// }
-	
-    // win.addEventListener('beforeunload', function (event) {
-//        var answer = confirm('Do you want to quit ?');
-//        event.returnValue = answer;
-//      });
-
-
-	win.on('close', function(e) {
+	win.on("close", function(e) {
 		console.log("close " + win.id + " " + filePath)
 		e.preventDefault()
 		
 		fileManager.close(win, ext, (filePath) => {
 			console.log("perform close " + win.id)
 			
-			let doc = recentDocument(win, filePath)
-			updateCurrentDoc(doc)
-				.chain(addRecentDoc)
+			const doc = recentDocument(win, filePath)
+			addRecentDoc(doc)
 				.fork(console.error, console.log)
+			
+			if (appIsQuitting) {
+				runTask(updateCurrentDoc(doc))
+			}
+			else {
+				saveWindows()
+			}
+		
 			
 			containers = _.filter(containers, container => container.id !== win.id)
 			if (win) {
@@ -124,7 +108,7 @@ function createWindow(options) {
 		})
 	})
 	
-// 	win.on('closed', function() {
+// 	win.on("closed", function() {
 // 		containers = _.filter(containers, container => container.id !== winId)
 //
 // 		// if (appIsQuitting && containers.length == 0) {
@@ -132,13 +116,13 @@ function createWindow(options) {
 // // 		}
 // 	})
 
-	win.on('move', () => saveWindows())
-	win.on('resize', () => saveWindows())
+	win.on("move", () => saveWindows())
+	win.on("resize", () => saveWindows())
 
 	if(focusUpdateHandler) {
-		focusUpdateHandler();
-		win.on('focus', focusUpdateHandler);
-		win.on('blur', focusUpdateHandler);
+		focusUpdateHandler()
+		win.on("focus", focusUpdateHandler)
+		win.on("blur", focusUpdateHandler)
 	}
 	
 	if (openDevTools) {
@@ -151,21 +135,21 @@ function createWindow(options) {
 	return win
 }
 
-let createDocumentWindow = (properties, ext) => {
+const createDocumentWindow = (properties, ext) => {
     //not open, do the rest of the stuff
-	let win = BrowserWindow.getFocusedWindow()
-	let path = properties.filePath
+	const win = BrowserWindow.getFocusedWindow()
+	const path = properties.filePath
 	
-	let createWin = (path, contents) => {
+	const createWin = (path, contents) => {
 		return new Task((reject, resolve) => {
-		    fileManager.fileIsEdited(path, contents, isEdited => {
-			    if(win && !isEdited && contents === "") {
+			fileManager.fileIsEdited(path, contents, isEdited => {
+				if(win && !isEdited && contents === "") {
 					//open in current window
-					setUpWindow(win, filePath, contents)
+					setUpWindow(win, path, contents)
 					resolve(win)
-			    } else {
+				} else {
 
-					let options = {
+					const options = {
 						focusedWindow: win,
 						filePath: path,
 						fileContent: contents,
@@ -176,16 +160,16 @@ let createDocumentWindow = (properties, ext) => {
 						docExtension: ext
 					}
 		
-					let newWin = createWindow(options)
-	  			
+					const newWin = createWindow(options)
+
 					resolve(newWin)
-			    }
-		    })
+				}
+			})
 		})
 	}
 	
 	var result = Task.of(null)
- 	
+	
 	if (path) {
 		result = readFileTask(path)
 			.chain(contents => createWin(path, contents))
@@ -204,7 +188,7 @@ let createDocumentWindow = (properties, ext) => {
 		
 				console.log("Before add recent doc. Path: " + path)
 		
-				if (typeof path === 'string') {
+				if (typeof path === "string") {
 					return addRecentDoc(recentDocument(win, path))
 				}
 
@@ -221,27 +205,27 @@ function setUpWindow(win, filePath, contents) {
 			return c
 		})
 		
-		win.webContents.send('set-filepath', filePath)
+		win.webContents.send("set-filepath", filePath)
 		win.setRepresentedFilename(filePath)
 		win.setTitle(windowTitle(filePath))
 	}
 	if(contents) {
-		win.webContents.send('set-content', contents)
+		win.webContents.send("set-content", contents)
 	}
 }
 
-let loadWindows = (ext) => {
+const loadWindows = (ext) => {
 	console.log("load windows")
 	loadCurrentDocs()
 		.fork(console.error, docs => {	
 			console.log("loaded current docs")
-			let recents = _.filter(docs, recent => typeof recent === 'object')
+			const recents = _.filter(docs, recent => typeof recent === "object")
 			Immutable.fromJS(recents)
 				.map(prop => prop.toJS())
 				.traverse(Task.of, prop => createDocumentWindow(prop, ext))
 				.fork(console.error, results => {
 					console.log("create windows: " + results)
-					let windows = _.filter(results.toArray(), win => win != null)
+					const windows = _.filter(results.toArray(), win => win != null)
 					if (windows.length === 0) {
 						createWindow({ docExtension: ext })
 					}			
@@ -249,7 +233,7 @@ let loadWindows = (ext) => {
 		})
 }
 
-let recentDocumentForWin = win => {
+const recentDocumentForWin = win => {
 	return {
 			id: win.id,
 			x: win.getBounds().x,
@@ -259,25 +243,25 @@ let recentDocumentForWin = win => {
 	}
 }
 
-let recentDocumentForPath = path => {
+const recentDocumentForPath = path => {
 	return {
 		filePath: path
 	}
 }
 
-let recentDocument = (win, path) => {
+const recentDocument = (win, path) => {
 	return Object.assign(recentDocumentForWin(win), recentDocumentForPath(path))
 }
 
-let loadProperties = () => {
-	let results = _.map(containers, c => {
+const loadProperties = () => {
+	const results = _.map(containers, c => {
 		return recentDocument(c.window, c.filePath)		
 	})
 	
 	return Task.of(results)
 }
 
-let saveWindows = () => {
+const saveWindows = () => {
 	loadProperties()
 		.chain(saveCurrentDocs)
 		.fork(console.error, console.log)
@@ -293,11 +277,10 @@ module.exports = {
 	setFocusUpdateHandler: function(func) {
 		focusUpdateHandler = func
 	},
-	initializeWithEntryPoint: function(entryPointArg, askCloseWindow, showDevTools) {
+	initializeWithEntryPoint: function(entryPointArg, showDevTools) {
 		indexFile = entryPointArg
-		shouldCloseWindow = askCloseWindow
 		openDevTools = showDevTools
- 	},
+	},
 	windowCloseCancelled: () => {
 		appIsQuitting = false
 	},
@@ -314,4 +297,4 @@ module.exports = {
 	
 	saveWindows: saveWindows,
 	loadWindows: loadWindows
-};
+}

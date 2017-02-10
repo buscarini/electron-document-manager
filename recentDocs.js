@@ -1,16 +1,16 @@
-'use strict';
-let _ = require('lodash');
-let Task = require('data.task')
+"use strict"
+const _ = require("lodash")
+const Task = require("data.task")
 
-let electron = require('electron')
-let app = electron.app
+const electron = require("electron")
+const app = electron.app
 
-let { preferences } = require('./preferences')
+const { preferences } = require("./preferences")
 
-let recentFilesKey = "document_recentFiles"
-let currentFilesKey = "document_currentFiles"
+const recentFilesKey = "document_recentFiles"
+const currentFilesKey = "document_currentFiles"
 
-let clearRecentDocs = () => {
+const clearRecentDocs = () => {
 	
 	app.clearRecentDocuments()
 	
@@ -27,16 +27,16 @@ let clearRecentDocs = () => {
 	
 }
 
-let cleanRecentDocs = docs => {
+const cleanRecentDocs = docs => {
 	return _.defaultTo(
 				_.uniqBy(
-					_.filter(docs || [], doc => typeof doc === "object" && typeof doc.filePath === 'string' && doc.filePath.length > 0),
+					_.filter(docs || [], doc => typeof doc === "object" && typeof doc.filePath === "string" && doc.filePath.length > 0),
 				"filePath")
 			, [])
 }
 
 
-let loadRecentDocs = () => {
+const loadRecentDocs = () => {
 	return new Task((reject, resolve) => {
 		preferences.get(recentFilesKey, (err, docs) => {
 			if (err) {
@@ -50,7 +50,7 @@ let loadRecentDocs = () => {
 	.map(cleanRecentDocs)
 }
 
-let saveRecentDocs = (docs) => {
+const saveRecentDocs = (docs) => {
 	return Task.of(cleanRecentDocs(docs))
 			.chain(docs => {
 				return new Task((reject, resolve) => {
@@ -67,15 +67,15 @@ let saveRecentDocs = (docs) => {
 			})
 }
 
-let addRecentDoc = (doc) => {
+const addRecentDoc = (doc) => {
 	try {
 		console.log("add recent doc " + JSON.stringify(doc))
 	}
 	catch(err) {
-		require('util').inspect(doc)
+		require("util").inspect(doc)
 	}
 	
-	let path = _.get(doc, "filePath", null)
+	const path = _.get(doc, "filePath", null)
 	if (path) app.addRecentDocument(path)
 	
 	return loadRecentDocs()
@@ -85,15 +85,15 @@ let addRecentDoc = (doc) => {
 		.map(docs => doc)
 }
 
-let cleanCurrentDocs = docs => {
+const cleanCurrentDocs = docs => {
 	return _.defaultTo(
 				_.uniqBy(
 					_.filter(_.defaultTo(docs, []), doc => typeof doc === "object" && typeof Number.isInteger(doc.id) && doc.id > 0),
-				"filePath")
+				"id")
 			, [])
 }
 
-let loadCurrentDocs = () => {
+const loadCurrentDocs = () => {
 	console.log("load current docs")
 	return new Task((reject, resolve) => {
 		preferences.get(currentFilesKey, (err, current) => {
@@ -108,7 +108,7 @@ let loadCurrentDocs = () => {
 	.map(cleanCurrentDocs)
 }
 
-let saveCurrentDocs = (docs) => {
+const saveCurrentDocs = (docs) => {
 	console.log("save current docs " + JSON.stringify(docs))
 	
 	return Task.of(cleanCurrentDocs(docs))
@@ -128,12 +128,12 @@ let saveCurrentDocs = (docs) => {
 				})
 }
 
-let updateCurrentDoc = doc => {
+const updateCurrentDoc = doc => {
 	try {
 		console.log("update current doc " + JSON.stringify(doc))	
 	}
 	catch(err) {
-		require('util').inspect(doc)
+		require("util").inspect(doc)
 	}
 	
 	return loadCurrentDocs()
@@ -143,7 +143,7 @@ let updateCurrentDoc = doc => {
 		})
 		.map(savedDocs => {
 			
-			let index = _.findIndex(savedDocs, saved => saved.id === doc)
+			const index = _.findIndex(savedDocs, saved => saved.id === doc)
 			if (index === -1) {
 				return _.concat(savedDocs, doc)
 			}
@@ -156,11 +156,12 @@ let updateCurrentDoc = doc => {
 }
 
 module.exports = {
-	loadRecentDocs: loadRecentDocs,
-	saveRecentDocs: saveRecentDocs,
-	addRecentDoc: addRecentDoc,
-	loadCurrentDocs: loadCurrentDocs,
-	saveCurrentDocs: saveCurrentDocs,
-	updateCurrentDoc: updateCurrentDoc
+	loadRecentDocs,
+	saveRecentDocs,
+	addRecentDoc,
+	clearRecentDocs,
+	loadCurrentDocs,
+	saveCurrentDocs,
+	updateCurrentDoc
 }
 

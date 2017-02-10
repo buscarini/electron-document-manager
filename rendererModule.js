@@ -6,7 +6,7 @@ const BrowserWindow = electron.remote.BrowserWindow
 
 const requestId = name => "request-" + name
 
-var filePath = null,
+let filePath = null,
 	setContent = null,
 	getContent = null,
 	notifyDocSaved = null
@@ -34,7 +34,7 @@ ipcRenderer.on("document_saved", function(event, filePathArg, callbackChannel) {
 
 
 ipcRenderer.on(requestId("filepath"), function(event, callbackChannel) {
-	var path = filePath
+	let path = filePath
 	if (filePath == null) {
 		path = ""
 	}

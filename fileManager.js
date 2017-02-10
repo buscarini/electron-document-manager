@@ -7,14 +7,14 @@ const path = require("path")
 const ipcHelper = require("./ipcHelper")
 const { windowTitle, id } = require("./utils")
 
-var fs = require("fs")
+let fs = require("fs")
 
 const Task = require("data.task")
 
 const fileExists = fs.existsSync
 
-var localize
-var documentChanged = (saved, current) => saved !== current
+let localize
+let documentChanged = (saved, current) => saved !== current
 
 function isEdited(filePath, content, completion) {
 	if(filePath && filePath != "no-path") {
@@ -22,7 +22,7 @@ function isEdited(filePath, content, completion) {
 			if (err) {
 					completion(true) //if there"s no file, it must have been changed
 			} else {
-				var savedContent = data.toString()
+				let savedContent = data.toString()
 				completion(documentChanged(savedContent, content))
 			}
 		})
@@ -175,7 +175,7 @@ const resolveClose = (win, edited, ext, content, performClose, closeCancelled) =
 		})
 	} else {		
 		// confirm with dialog
-		var button = dialog.showMessageBox({
+		let button = dialog.showMessageBox({
 			type: "question",
 			buttons: [ translate("Save changes"), translate("Discard changes"), translate("Cancel")],
 			message: translate("Your file was changed since saving the last time. Do you want to save before closing?")

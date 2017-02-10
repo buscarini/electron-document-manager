@@ -10,11 +10,11 @@ const fileManager = require("./fileManager")
 const windowManager = require("./windowManager")
 const { id, runTaskF, runTask } = require("./utils")
 
-var userMenuOptions = null
+let userMenuOptions = null
 
 const { loadRecentDocs, addRecentDoc, clearRecentDocs } = require("./recentDocs")
 
-var processMenu = null
+let processMenu = null
 
 const updateMenu = () => {
 	return createMenuOptions(userMenuOptions)
@@ -45,7 +45,7 @@ const createMenuOptions = (options) => {
 						openMethod: function(item, focusedWindow, event, filePath) {
 								fileManager.openFile(filePath).fork(console.error, filePath => {
 										//check if open in other window
-										var windows = windowManager.getWindows()
+										let windows = windowManager.getWindows()
 			
 								const winForFile = _.reduce(windows, (winForFile, win) =>	{
 									return (win.filePath === filePath) ? win : winForFile
@@ -94,7 +94,7 @@ const createMenuOptions = (options) => {
 }
 
 
-var initialize = function(options) {
+let initialize = function(options) {
 	
 	processMenu = options.processMenu
 	

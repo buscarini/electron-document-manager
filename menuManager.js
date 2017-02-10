@@ -34,7 +34,7 @@ function getMenuTemplate(options) {
 				}
 			])
 	
-	var template = [
+	let template = [
 		{
 			label:	"File",
 		id: "file",
@@ -207,7 +207,7 @@ function getMenuTemplate(options) {
 	]
 
 	if (process.platform == "darwin") {
-		var name = require("electron").app.getName()
+		let name = require("electron").app.getName()
 		template.unshift({
 			label: name,
 			submenu: [
@@ -269,17 +269,17 @@ function getMenuTemplate(options) {
 }
 
 //options saved from last time - so that you can just change a few
-var globalOptions = {}
+let globalOptions = {}
 
 const id = a => { return a }
 
 function setMenu(options) {
 	globalOptions = _.extend(globalOptions, options) //overwrite with later args
-	var template = getMenuTemplate(globalOptions)
+	let template = getMenuTemplate(globalOptions)
 
 	const processMenu = (options.processMenu === undefined || options.processMenu === null) ? id : options.processMenu
 
-	var menu = Menu.buildFromTemplate(processMenu(template))
+	let menu = Menu.buildFromTemplate(processMenu(template))
 	Menu.setApplicationMenu(menu)
 }
 

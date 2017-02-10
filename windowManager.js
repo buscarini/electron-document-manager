@@ -20,13 +20,13 @@ const Container = (win, path) => {
 	}
 }
 
-var containers = []
-var untitledIndex = 1
-var indexFile
-var openDevTools
-var appIsQuitting = false
+let containers = []
+let untitledIndex = 1
+let indexFile
+let openDevTools
+let appIsQuitting = false
 
-var focusUpdateHandler = null
+let focusUpdateHandler = null
 
 function createWindow(options) {
 	options = options || {}
@@ -34,9 +34,9 @@ function createWindow(options) {
 	const ext = options.docExtension || ".onemodel"
 
 	//pick a title (set as BrowserWindow.title and send with set-title)
-	var title = options.filePath ? windowTitle(options.filePath) : ( "Untitled " + untitledIndex++ )
+	let title = options.filePath ? windowTitle(options.filePath) : ( "Untitled " + untitledIndex++ )
 
-	var parameters = {
+	let parameters = {
 		x: _.defaultTo(options.x, null),
 		y: _.defaultTo(options.y, null),
 		width: _.defaultTo(options.width, 900),
@@ -45,7 +45,7 @@ function createWindow(options) {
 	}
 
 	if(options.focusedWindow) {
-		var bounds = options.focusedWindow.getBounds()
+		let bounds = options.focusedWindow.getBounds()
 		parameters = _.extend(parameters, {
 			x: bounds.x + 20,
 			y: bounds.y + 20
@@ -55,7 +55,7 @@ function createWindow(options) {
 	parameters = _.extend(parameters, { show: false })
 
 	// Create the browser window.
-	var win = null
+	let win = null
 	win = new BrowserWindow(parameters)
 	win.once("ready-to-show", () => {
 		win.show()
@@ -168,7 +168,7 @@ const createDocumentWindow = (properties, ext) => {
 		})
 	}
 	
-	var result = Task.of(null)
+	let result = Task.of(null)
 	
 	if (path) {
 		result = readFileTask(path)

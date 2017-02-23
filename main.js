@@ -104,7 +104,6 @@ let initialize = function(options) {
 	userMenuOptions.processMenu = processMenu || id
 	
 	const windowOptions = options.windowOptions || {}
-	console.log("windowOptions: " + JSON.stringify(windowOptions))
 
 	const ext = _.defaultTo(options.docExtension, "")
 	

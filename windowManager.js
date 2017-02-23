@@ -31,7 +31,6 @@ let focusUpdateHandler = null
 
 function createWindow(options) {
 	options = options || {}
-	console.log("options: " + JSON.stringify(options))
 		
 	const ext = options.docExtension || ".onemodel"
 
@@ -55,8 +54,6 @@ function createWindow(options) {
 	}
 
 	parameters = _.extend(parameters, { show: false })
-		
-	console.log("parameters: " + JSON.stringify(parameters))
 
 	// Create the browser window.
 	let win = null
@@ -67,8 +64,6 @@ function createWindow(options) {
 	
 	const minWidth = options.minWidth || 50
 	const minHeight = options.minHeight || 50
-	console.log("minWidth: " + JSON.stringify(minWidth))
-	console.log("minHeight: " + JSON.stringify(minHeight))
 	win.setMinimumSize(minWidth, minHeight)
 	
 	const container = Container(win, options.filePath, options.tmpPath)

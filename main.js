@@ -34,13 +34,15 @@ const addRecentDocument = (doc) => {
 const createMenuOptions = (options) => {
 	console.log("menuOptions")
 	
+	const windowOptions = options.windowOptions || {}
+	
 	return loadRecentDocs()
 		.map(docs => {		
 			const ext = _.defaultTo(options.docExtension, "")
 	
 			const menu = {
 						newMethod: function(item, focusedWindow) {
-							windowManager.createWindow({ focusedWindow: focusedWindow, docExtension: ext })
+							windowManager.createWindow(_.extend({ focusedWindow: focusedWindow, docExtension: ext }, windowOptions))
 						},
 						openMethod: function(item, focusedWindow, event, filePath) {
 								fileManager.openFile(filePath).fork(console.error, filePath => {
@@ -57,7 +59,7 @@ const createMenuOptions = (options) => {
 								}
 								else {
 									console.log("Creating doc for opened document")
-									windowManager.createDocumentWindow({ filePath: filePath }, ext, windowManager.saveWindows)
+									windowManager.createDocumentWindow(_.extend({ filePath: filePath }, windowOptions), ext, windowManager.saveWindows)
 									.chain(updateMenu)
 											.fork(console.error, console.log)
 								}
@@ -100,6 +102,9 @@ let initialize = function(options) {
 	
 	userMenuOptions = options
 	userMenuOptions.processMenu = processMenu || id
+	
+	const windowOptions = options.windowOptions || {}
+	console.log("windowOptions: " + JSON.stringify(windowOptions))
 
 	const ext = _.defaultTo(options.docExtension, "")
 	
@@ -111,7 +116,7 @@ let initialize = function(options) {
 	fileManager.setCompareDocument(options.documentChanged)
 	
 	app.on("activate", function () {
-		if (windowManager.getWindowContainers().length === 0) windowManager.createWindow({ docExtension: ext })
+		if (windowManager.getWindowContainers().length === 0) windowManager.createWindow(_.extend({ docExtension: ext }, windowOptions))
 		runTask(updateMenu())
 	})
 	
@@ -135,7 +140,7 @@ let initialize = function(options) {
 	})
 	
 	app.on("open-file", function(e, filePath) {		
-		windowManager.createDocumentWindow({ filePath: filePath }, ext)
+		windowManager.createDocumentWindow(_.extend({ filePath: filePath }, windowOptions), ext)
 			.chain(updateMenu)
 			.fork(console.error, console.log)
 	})
@@ -145,14 +150,13 @@ let initialize = function(options) {
 	app.on("ready", function() {
 		
 		//set up menu
-	createMenuOptions(userMenuOptions).fork(console.error, menuManager.setMenu)
+		createMenuOptions(userMenuOptions).fork(console.error, menuManager.setMenu)
 		
 		//set up window menu updates - to be run on focus, blur, and window create
 		// windowManager.setFocusUpdateHandler(() => menuManager.updateMenu(menuOptions(userMenuOptions)) )
 
-
-	// Restore windows
-	windowManager.loadWindows(ext)
+		// Restore windows
+		windowManager.loadWindows(ext, windowOptions)
 	})
 		
 }

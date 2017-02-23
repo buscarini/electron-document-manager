@@ -31,6 +31,7 @@ let focusUpdateHandler = null
 
 function createWindow(options) {
 	options = options || {}
+	console.log("options: " + JSON.stringify(options))
 		
 	const ext = options.docExtension || ".onemodel"
 
@@ -54,6 +55,8 @@ function createWindow(options) {
 	}
 
 	parameters = _.extend(parameters, { show: false })
+		
+	console.log("parameters: " + JSON.stringify(parameters))
 
 	// Create the browser window.
 	let win = null
@@ -61,6 +64,12 @@ function createWindow(options) {
 	win.once("ready-to-show", () => {
 		win.show()
 	})
+	
+	const minWidth = options.minWidth || 50
+	const minHeight = options.minHeight || 50
+	console.log("minWidth: " + JSON.stringify(minWidth))
+	console.log("minHeight: " + JSON.stringify(minHeight))
+	win.setMinimumSize(minWidth, minHeight)
 	
 	const container = Container(win, options.filePath, options.tmpPath)
 	containers.push(container)
@@ -159,7 +168,9 @@ const createDocumentWindow = (properties, ext) => {
 						y: properties.y,
 						width: properties.width,
 						height: properties.height,
-						docExtension: ext
+						docExtension: ext,
+						minWidth: properties.minWidth,
+						minHeight: properties.minHeight
 					}
 		
 					const newWin = createWindow(options)
@@ -216,7 +227,7 @@ function setUpWindow(win, filePath, contents) {
 	}
 }
 
-const loadWindows = (ext) => {
+const loadWindows = (ext, options) => {
 	console.log("load windows")
 	loadCurrentDocs()
 		.map(R.reverse)
@@ -225,12 +236,12 @@ const loadWindows = (ext) => {
 			const recents = _.filter(docs, recent => typeof recent === "object")
 			Immutable.fromJS(recents)
 				.map(prop => prop.toJS())
-				.traverse(Task.of, prop => createDocumentWindow(prop, ext))
+				.traverse(Task.of, prop => createDocumentWindow(_.extend(prop, options), ext))
 				.fork(console.error, results => {
 					console.log("create windows: " + results)
 					const windows = _.filter(results.toArray(), win => win != null)
 					if (windows.length === 0) {
-						createWindow({ docExtension: ext })
+						createWindow(_.extend({ docExtension: ext }, options))
 					}			
 				})
 		})

@@ -27,14 +27,23 @@ const clearRecentDocs = () => {
 	
 }
 
-const cleanRecentDocs = docs => {
+const uniqueFilePath = items => {
 	return _.defaultTo(
 				_.uniqBy(
-					_.filter(docs || [], doc => typeof doc === "object" && typeof doc.filePath === "string" && doc.filePath.length > 0),
+					_.filter(items || [], doc => typeof doc === "object" && typeof doc.filePath === "string" && doc.filePath.length > 0),
 				"filePath")
 			, [])
 }
 
+const uniqueId = items => {
+	return _.defaultTo(
+			_.uniqBy(
+				_.filter(_.defaultTo(items, []), doc => typeof doc === "object" && typeof Number.isInteger(doc.id) && doc.id > 0),
+				"id")
+			, [])
+}
+
+const cleanRecentDocs = uniqueFilePath
 
 const loadRecentDocs = () => {
 	return new Task((reject, resolve) => {
@@ -86,11 +95,7 @@ const addRecentDoc = (doc) => {
 }
 
 const cleanCurrentDocs = docs => {
-	return _.defaultTo(
-				_.uniqBy(
-					_.filter(_.defaultTo(docs, []), doc => typeof doc === "object" && typeof Number.isInteger(doc.id) && doc.id > 0),
-				"id")
-			, [])
+	return uniqueId(uniqueFilePath(docs))
 }
 
 const loadCurrentDocs = () => {

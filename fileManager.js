@@ -7,6 +7,7 @@ const path = require("path")
 const ipcHelper = require("./ipcHelper")
 const { windowTitle, id } = require("./utils")
 const chokidar = require("chokidar")
+const dialogTasks = require("./dialogTasks")
 
 let fs = require("./fileTasks")
 
@@ -180,13 +181,25 @@ const genericSaveOrSaveAs = (win, type, ext, callback) => {
 		})
 }
 
-const documentEdited = (win, cb) => {
-	getFilepathAndContent(win)
-		.fork(console.error, (filePath, content) => {
-			isEdited(filePath,content, edited => {
-				cb(edited)
-			})
-		})
+const mergeChanges = (filePath, fileContents, win, winContents) => {
+
+	const keepChanges = silentSaveTask(win)
+		
+	const reloadFromDisk = new Task((reject, resolve) => {
+		win.webContents.send("set-content", fileContents)
+		resolve(fileContents)
+	})
+	
+	if (documentChanged(fileContents, winContents)) {
+		// Ask the user which one to keep
+		return dialogTasks.ask("The file has been changedo on disk. Do you want to keep your changes, or reload the document?", [
+			{ name: "Reload From Disk", reloadFromDisk },
+			{ name: "Keep My Changes", keepChanges }
+		])
+	}
+	else {
+		return reloadFromDisk
+	}
 }
 
 const windowPathChanged = (win, filePath) => {
@@ -197,13 +210,15 @@ const windowPathChanged = (win, filePath) => {
 		.on("change", path => {
 			// TODO: see what to do here
 			// If the document hasn't changed, reload from disk. If it has changed, ask the user and loose changes or keep the memory changes and save to disk
-			documentEdited(win, edited => {
-				if (edited) {
-					
-				}
-				else {
-					
-				}
+			
+			(Task.of((fileContents, pathAndContents) => {
+						mergeChanges(filePath, fileContents, win, pathAndContents.contents)
+					})
+					.ap(fs.readFile(path))
+					.ap(getFilepathAndContent(win))
+			)
+			.fork(console.error, res => {
+				console.log("Merged changes")
 			})
 		})
 		.on("unlink", path => {
@@ -212,28 +227,20 @@ const windowPathChanged = (win, filePath) => {
 		})
 }
 
-const silentSave = (win, callback) => {
+const silentSaveTask = (win) => {
 	getFilepathAndContent(win)		
 		.chain(results => {
 			return fs.writeFile(results.filePath, results.content)
 		})
+}
+
+const silentSave = (win, callback) => {
+	silentSaveTask(win)
 		.fork(err => {
 			callback(err, null)
 		}, path => {
 			callback(null, path)
 		})
-		
-		// .fork(console.error, (filePath, content) => {
-		// 	Task.of(filePath)
-		// 		.chain(path => {
-		// 			return fs.writeFile(path, content)
-		// 		})
-		// 		.fork(err => {
-		// 			callback(err, filePath)
-		// 		}, data => {
-		// 			callback(null, filePath)
-		// 		})
-		// })
 }
 
 const closeWindow = (win, ext, performClose, closeCancelled) => {

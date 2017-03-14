@@ -1,3 +1,3 @@
-var DocumentManager = require('..').main;
+const DocumentManager = require("..").main
 
-DocumentManager({ entryPoint: 'file://' + __dirname + '/index.html' });
+DocumentManager({ entryPoint: "file://" + __dirname + "/index.html" })

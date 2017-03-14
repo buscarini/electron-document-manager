@@ -5,7 +5,8 @@ const app = electron.app
 const R = require("ramda")
 const BrowserWindow = electron.BrowserWindow
 const _ = require("lodash")
-const { windowTitle, readFileTask, runTask } = require("./utils")
+const { windowTitle, runTask } = require("./utils")
+const fs = require("./fileTasks")
 
 const Immutable = require("immutable-ext")
 const Task = require("data.task")
@@ -176,21 +177,24 @@ const createDocumentWindow = (properties, ext) => {
 		})
 	}
 	
-	let result = Task.of(null)
-	
-	if (path) {
-		result = readFileTask(path)
-			.chain(contents => createWin(path, contents))
-	}
-	else {
-		result = createWin(path, "")
-	}
+	// let result = Task.of(null)
+	//
+	// if (path) {
+	// 	result = fs.readFile(path)
+	// 		.chain(contents => createWin(path, contents))
+	// }
+	// else {
+	// 	result = createWin(path, "")
+	// }
 	
 	
 	console.log("created window for doc " + path)
 	
 	
-	return result
+	return Task.of(path)
+			.chain(fs.readFile)	
+			.chain(contents => createWin(path, contents))
+			.orElse(x => Task.of(createWin(null, "")))
 			.chain(win => {		
 				saveWindows()
 		
@@ -213,10 +217,12 @@ function setUpWindow(win, filePath, contents) {
 			return c
 		})
 		
-		win.webContents.send("set-filepath", filePath)
+		fileManager.windowPathChanged(win, filePath)
+		// win.webContents.send("set-filepath", filePath)
 		win.setRepresentedFilename(filePath)
 		win.setTitle(windowTitle(filePath))
 	}
+	
 	if(contents) {
 		win.webContents.send("set-content", contents)
 	}

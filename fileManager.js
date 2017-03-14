@@ -6,8 +6,9 @@ const BrowserWindow = electron.BrowserWindow
 const path = require("path")
 const ipcHelper = require("./ipcHelper")
 const { windowTitle, id } = require("./utils")
+const chokidar = require("chokidar")
 
-let fs = require("fs")
+let fs = require("./fileTasks")
 
 const Task = require("data.task")
 
@@ -17,15 +18,15 @@ let localize
 let documentChanged = (saved, current) => saved !== current
 
 function isEdited(filePath, content, completion) {
-	if(filePath && filePath != "no-path") {
-		fs.readFile(filePath, function (err, data) {
-			if (err) {
-					completion(true) //if there"s no file, it must have been changed
-			} else {
-				let savedContent = data.toString()
-				completion(documentChanged(savedContent, content))
-			}
-		})
+	if (filePath && filePath != "no-path") {
+		fs.readFile(filePath)
+			.map(data => data.toString())
+			.map(fileContent => documentChanged(fileContent, content))
+			.fork(err => {
+				completion(true) //if there's no file, it must have been changed
+			}, data => {
+				
+			})
 	}
 	else {
 		completion(content !== "")
@@ -33,9 +34,11 @@ function isEdited(filePath, content, completion) {
 }
 
 // requests filename and content from current browser window
-function getFilepathAndContent(win, cb) {
-	ipcHelper.requestFromRenderer(win, "filepath_content", function(event, results) {
-		cb(results.filePath, results.content)
+function getFilepathAndContent(win) {
+	return new Task((reject, resolve) => {
+		ipcHelper.requestFromRenderer(win, "filepath_content", function(event, results) {
+			resolve(results)
+		})
 	})
 }
 
@@ -80,72 +83,171 @@ const userSaveAsHandler = (ext, callback) => {
 	genericSaveOrSaveAs(win, "save-as", ext, callback)
 }
 
+const checkNotNull = something => {
+	return new Task((reject, resolve) => {
+		if (something) {
+			resolve(something)
+		}
+		else {
+			reject("Error")
+		}
+	})
+}
+
 const genericSaveOrSaveAs = (win, type, ext, callback) => {
 	
 	const translate = localize || id
 	
 	console.log("generic save or save as " + win.id)
 	
-	getFilepathAndContent(win, function(filePath, content) {		
-		if (type === "save-as" || !filePath) {
-			dialog.showSaveDialog({
-					filters: [
-						{name: "OneModel", extensions: ["onemodel"]},
-						{name: translate("All Files"), extensions: ["*"]}
-					]
-				},
-				function(filePath) {
-					if(filePath) { //else user cancelled, do nothing
-						//send new filePath to renderer
+	getFilepathAndContent(win)
+		.fork(console.error, results => {
+			if (type === "save-as" || !results.filePath) {
+				dialog.showSaveDialog({
+						filters: [
+							{name: "OneModel", extensions: ["onemodel"]},
+							{name: translate("All Files"), extensions: ["*"]}
+						]
+					},
+					function(filePath) {
+						Task.of(filePath)
+							.chain(checkNotNull)
+							.map(filePath => {
+								if (path.extname(filePath).length == 0 && ext.length > 0) {
+									return filePath + "." + ext
+								}
+								else {
+									return path
+								}
+							})
+							.chain(filePath => {
+								return new Task((reject, resolve) => {
+									setImmediate(function() { //wait a tick so that dialog goes away and window focused again
+										const win = BrowserWindow.getFocusedWindow()
+										win.setRepresentedFilename(filePath)
+										win.setTitle(windowTitle(filePath))
+										// win.filePath = filePath
+										windowPathChanged(win, filePath)
+										// win.webContents.send("set-filepath", filePath)
+										resolve(filePath)
+									})
+								})
+							})
+							.chain(filePath => fs.writeFile(filePath, results.content))
+							.fork(err => {
+								callback(err, filePath)
+							}, path => {
+								callback(null, path)
+							})							
+						
+						
+						/*if (filePath) { //else user cancelled, do nothing
+							//send new filePath to renderer
 					
-						if (path.extname(filePath).length == 0 && ext.length > 0) {
-							filePath = filePath + "." + ext
+							if (path.extname(filePath).length == 0 && ext.length > 0) {
+								filePath = filePath + "." + ext
+							}
+					
+							setImmediate(function() { //wait a tick so that dialog goes away and window focused again
+								const win = BrowserWindow.getFocusedWindow()
+								win.setRepresentedFilename(filePath)
+								win.setTitle(windowTitle(filePath))
+								// win.filePath = filePath
+								windowPathChanged(win, filePath)
+								// win.webContents.send("set-filepath", filePath)
+							})
+							fs.writeFile(filePath, content)
+								.fork(err => {
+									callback(err, filePath)
+								}, path => {
+									callback(null, path)
+								})							
 						}
+						else {
+							if (callback) callback("User cancelled", filePath)
+						}*/
+					}
+				)
+			}
+			else {
+				fs.writeFile(results.filePath, results.content)
+					.fork(err => {
+						callback(err, results.filePath)
+					}, path => {
+						callback(null, path)
+					})	
+			}
+		})
+}
+
+const documentEdited = (win, cb) => {
+	getFilepathAndContent(win)
+		.fork(console.error, (filePath, content) => {
+			isEdited(filePath,content, edited => {
+				cb(edited)
+			})
+		})
+}
+
+const windowPathChanged = (win, filePath) => {
+	win.filePath = filePath
+	win.webContents.send("set-filepath", filePath)
+	if (win.watcher) { win.watcher.close() }
+	win.watcher = chokidar.watch(filePath)
+		.on("change", path => {
+			// TODO: see what to do here
+			// If the document hasn't changed, reload from disk. If it has changed, ask the user and loose changes or keep the memory changes and save to disk
+			documentEdited(win, edited => {
+				if (edited) {
 					
-						setImmediate(function() { //wait a tick so that dialog goes away and window focused again
-							const win = BrowserWindow.getFocusedWindow()
-							win.setRepresentedFilename(filePath)
-							win.setTitle(windowTitle(filePath))
-							win.filePath = filePath
-							win.webContents.send("set-filepath", filePath)
-						})
-						writeToFile(filePath, content, callback)
-					}
-					else {
-						if (callback) callback("User cancelled", filePath)
-					}
 				}
-			)
-		} else {
-			writeToFile(filePath, content, callback)
-		}
-	})
+				else {
+					
+				}
+			})
+		})
+		.on("unlink", path => {
+			// TODO: see what to do when the file is deleted
+			
+		})
 }
 
 const silentSave = (win, callback) => {
-	getFilepathAndContent(win, function(filePath, content) {
-		if (filePath) {
-			console.log("about to save to " + filePath)
-			writeToFile(filePath, content, callback)
-		}
-		else {
-			console.log("can't save, abort")
-			callback("Needs to ask to save")
-		}
-	})
+	getFilepathAndContent(win)		
+		.chain(results => {
+			return fs.writeFile(results.filePath, results.content)
+		})
+		.fork(err => {
+			callback(err, null)
+		}, path => {
+			callback(null, path)
+		})
+		
+		// .fork(console.error, (filePath, content) => {
+		// 	Task.of(filePath)
+		// 		.chain(path => {
+		// 			return fs.writeFile(path, content)
+		// 		})
+		// 		.fork(err => {
+		// 			callback(err, filePath)
+		// 		}, data => {
+		// 			callback(null, filePath)
+		// 		})
+		// })
 }
 
 const closeWindow = (win, ext, performClose, closeCancelled) => {
-	getFilepathAndContent(win, function(filePath, content) {
-		if(filePath) {
-			isEdited(filePath,content, edited => {
-				resolveClose(win, edited, ext, content, performClose, closeCancelled)	
-			})
+	getFilepathAndContent(win)
+		.fork(console.error, (results) => {
+			if(results.filePath) {
+				isEdited(results.filePath, results.content, edited => {
+					resolveClose(win, edited, ext, results.content, performClose, closeCancelled)	
+				})
 			
-		} else {
-			resolveClose(win, (content !== ""), ext, content, performClose, closeCancelled)
-		}
-	})
+			} else {
+				resolveClose(win, (results.content !== ""), ext, results.content, performClose, closeCancelled)
+			}
+		})
 }
 
 const resolveClose = (win, edited, ext, content, performClose, closeCancelled) => {
@@ -202,19 +304,6 @@ const resolveClose = (win, edited, ext, content, performClose, closeCancelled) =
 	}
 }
 
-function writeToFile(filePath, content, callback) {
-	if (typeof content !== "string") {
-		throw new TypeError("getContent must return a string")
-	}
-	fs.writeFile(filePath, content, function (err) {
-		callback(err, filePath)
-		if (err) {
-			console.log("Write failed: " + err)
-			return
-		}
-	})
-}
-
 module.exports = {
 	localize: (translate) => {
 		localize = translate
@@ -229,5 +318,6 @@ module.exports = {
 	fileIsEdited: isEdited,
 	setCompareDocument: (docChanged) => {
 		documentChanged = docChanged
-	}
+	},
+	windowPathChanged: windowPathChanged
 }

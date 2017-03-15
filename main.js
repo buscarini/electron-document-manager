@@ -49,20 +49,21 @@ const createMenuOptions = (options) => {
 										//check if open in other window
 										let windows = windowManager.getWindows()
 			
-								const winForFile = _.reduce(windows, (winForFile, win) =>	{
-									return (win.filePath === filePath) ? win : winForFile
-								}, null)
+										const winForFile = _.reduce(windows, (winForFile, win) =>	{
+											return (win.filePath === filePath) ? win : winForFile
+										}, null)
 
-								if (winForFile) {
-									console.log("File already open. Focusing window")
-									winForFile.focus()
-								}
-								else {
-									console.log("Creating doc for opened document")
-									windowManager.createDocumentWindow(_.extend({ filePath: filePath }, windowOptions), ext, windowManager.saveWindows)
-									.chain(updateMenu)
-											.fork(console.error, console.log)
-								}
+										if (winForFile) {
+											console.log("File already open. Focusing window")
+											winForFile.focus()
+										}
+										else {
+											console.log("Creating doc for opened document")
+											windowManager.createDocumentWindow(_.extend({ filePath: filePath }, windowOptions), ext, windowManager.saveWindows)
+												.map(x => { console.log(x); return x })
+												.chain(updateMenu)
+												.fork(console.error, console.log)
+										}
 								})
 					},
 						saveMethod: function(item, focusedWindow) {

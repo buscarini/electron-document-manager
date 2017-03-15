@@ -26,7 +26,8 @@ function isEdited(filePath, content, completion) {
 			.fork(err => {
 				completion(true) //if there's no file, it must have been changed
 			}, data => {
-				
+				let savedContent = data.toString()
+				completion(documentChanged(savedContent, content))
 			})
 	}
 	else {

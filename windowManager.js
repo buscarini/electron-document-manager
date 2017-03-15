@@ -192,10 +192,12 @@ const createDocumentWindow = (properties, ext) => {
 	
 	
 	return Task.of(path)
-			.chain(fs.readFile)	
+			.chain(fs.readFile)
+			.map(x => { console.log(x); return x })
 			.chain(contents => createWin(path, contents))
 			.orElse(x => Task.of(createWin(null, "")))
-			.chain(win => {		
+			.map(x => { console.log(x); return x })
+			.chain(win => {
 				saveWindows()
 		
 				console.log("Before add recent doc. Path: " + path)

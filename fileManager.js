@@ -13,48 +13,48 @@ let fs = require("./fileTasks")
 
 const Task = require("data.task")
 
+let writingFiles = {}
+
 const fileExists = fs.existsSync
 
 let localize
 let documentChanged = (saved, current) => saved !== current
 
-function isEdited(filePath, content, completion) {
+function hasChanges(filePath, content, completion) {
 	if (filePath && filePath != "no-path") {
 		fs.readFile(filePath)
 			.map(data => data.toString())
 			.map(fileContent => documentChanged(fileContent, content))
-			.fork(err => {
-				completion(true) //if there's no file, it must have been changed
-			}, data => {
-				let savedContent = data.toString()
-				completion(documentChanged(savedContent, content))
-			})
+			.fork(err => completion(true) //if there's no file, we have changes
+				, completion)
 	}
 	else {
 		completion(content !== "")
 	}
 }
 
-// requests filename and content from current browser window
-function getFilepathAndContent(win) {
+const askRenderer = property => win => {
 	return new Task((reject, resolve) => {
-		ipcHelper.requestFromRenderer(win, "filepath_content", function(event, results) {
+		ipcHelper.requestFromRenderer(win, property, (event, results) => {
+			console.log("asked renderer for property: " + property)
 			resolve(results)
 		})
 	})
 }
+
+// requests filename and content from current browser window
+const getFilepathAndContent = askRenderer("filepath_content")
+const isWinDocumentEdited = askRenderer("is_edited")
+
 
 // OPEN get path to the file-to-open
 function userOpensHandler(filePath) {
 	//check if already open
 	if (!filePath || filePath.length === 0 ) {
 		return new Task((reject, resolve) => {
-			console.log("Show open dialog")	
 			dialog.showOpenDialog({
 				properties: ["openFile"]
-			}, function(filePaths) {
-				console.log(filePaths)
-				
+			}, function(filePaths) {				
 				if (filePaths instanceof Array && filePaths[0]) {
 					resolve(filePaths[0])
 				}
@@ -71,9 +71,6 @@ function userOpensHandler(filePath) {
 }
 
 // SAVE
-
-
-
 
 const userSavesHandler = (ext, callback) => {
 	const win = BrowserWindow.getFocusedWindow()
@@ -141,33 +138,6 @@ const genericSaveOrSaveAs = (win, type, ext, callback) => {
 							}, path => {
 								callback(null, path)
 							})							
-						
-						
-						/*if (filePath) { //else user cancelled, do nothing
-							//send new filePath to renderer
-					
-							if (path.extname(filePath).length == 0 && ext.length > 0) {
-								filePath = filePath + "." + ext
-							}
-					
-							setImmediate(function() { //wait a tick so that dialog goes away and window focused again
-								const win = BrowserWindow.getFocusedWindow()
-								win.setRepresentedFilename(filePath)
-								win.setTitle(windowTitle(filePath))
-								// win.filePath = filePath
-								windowPathChanged(win, filePath)
-								// win.webContents.send("set-filepath", filePath)
-							})
-							fs.writeFile(filePath, content)
-								.fork(err => {
-									callback(err, filePath)
-								}, path => {
-									callback(null, path)
-								})							
-						}
-						else {
-							if (callback) callback("User cancelled", filePath)
-						}*/
 					}
 				)
 			}
@@ -182,25 +152,39 @@ const genericSaveOrSaveAs = (win, type, ext, callback) => {
 		})
 }
 
-const mergeChanges = (filePath, fileContents, win, winContents) => {
-
+const mergeContents = (filePath, fileContents, win, winContents) => {
 	const keepChanges = silentSaveTask(win)
-		
 	const reloadFromDisk = new Task((reject, resolve) => {
+		console.log("Reloading from disk")
 		win.webContents.send("set-content", fileContents)
 		resolve(fileContents)
 	})
-	
+	const askWhat2Do = dialogTasks.ask("The file has been changedo on disk. Do you want to keep your changes, or reload the document?", [
+		{ name: "Reload From Disk", task: reloadFromDisk },
+		{ name: "Keep My Changes", task: keepChanges }
+	])
+		
 	if (documentChanged(fileContents, winContents)) {
-		// Ask the user which one to keep
-		return dialogTasks.ask("The file has been changedo on disk. Do you want to keep your changes, or reload the document?", [
-			{ name: "Reload From Disk", reloadFromDisk },
-			{ name: "Keep My Changes", keepChanges }
-		])
+		return Task.of(winContents)
 	}
-	else {
-		return reloadFromDisk
-	}
+		
+	return isWinDocumentEdited(win)
+		.chain(edited => {
+			console.log("edited: " + JSON.stringify(edited))
+			return edited ? askWhat2Do : reloadFromDisk
+		})
+}
+
+const mergeChanges = (win, path) => {
+	return (Task.of(fileContents => pathAndContents => {
+						console.log("Merge changes")
+						return { fileContents: fileContents, winContents: pathAndContents.content }
+						// return mergeContents(path, fileContents, win, pathAndContents.content)
+					})
+					.ap(fs.readFile(path))
+					.ap(getFilepathAndContent(win))
+			)
+			.chain(allContents => mergeContents(path, allContents.fileContents, win, allContents.winContents))
 }
 
 const windowPathChanged = (win, filePath) => {
@@ -209,18 +193,21 @@ const windowPathChanged = (win, filePath) => {
 	if (win.watcher) { win.watcher.close() }
 	win.watcher = chokidar.watch(filePath)
 		.on("change", path => {
+			
+			if (writingFiles[filePath] === true) {
+				writingFiles[filePath] = false
+				console.log("Writing file, ignore changes")
+				return
+			}
+			
 			// TODO: see what to do here
 			// If the document hasn't changed, reload from disk. If it has changed, ask the user and loose changes or keep the memory changes and save to disk
+			console.log("FILE CHANGED")
 			
-			(Task.of((fileContents, pathAndContents) => {
-						mergeChanges(filePath, fileContents, win, pathAndContents.contents)
-					})
-					.ap(fs.readFile(path))
-					.ap(getFilepathAndContent(win))
-			)
-			.fork(console.error, res => {
-				console.log("Merged changes")
-			})
+			mergeChanges(win, path)
+				.fork(console.error, res => {
+					console.log("Merged changes")
+				})
 		})
 		.on("unlink", path => {
 			// TODO: see what to do when the file is deleted
@@ -229,10 +216,22 @@ const windowPathChanged = (win, filePath) => {
 }
 
 const silentSaveTask = (win) => {
-	getFilepathAndContent(win)		
-		.chain(results => {
-			return fs.writeFile(results.filePath, results.content)
+	return getFilepathAndContent(win)
+		.map(results => {
+			console.log("writing file")
+			writingFiles[results.filePath] = true
+			return results
 		})
+		.chain(results => {
+			console.log("silent save")
+			return fs.writeFile(results.filePath, results.content)
+				// .map(x => results)
+		})
+		// .map(results => {
+// 			console.log("not writing file anymore")
+// 			writingFiles[results.filePath] = false
+// 			return results
+// 		})
 }
 
 const silentSave = (win, callback) => {
@@ -244,16 +243,26 @@ const silentSave = (win, callback) => {
 		})
 }
 
+const cleanup = win => {
+	if (win.watcher) { win.watcher.close() }
+}
+
 const closeWindow = (win, ext, performClose, closeCancelled) => {
+	
+	const closeAndCleanup = () => {
+		cleanup(win)
+		performClose()
+	}
+	
 	getFilepathAndContent(win)
 		.fork(console.error, (results) => {
 			if(results.filePath) {
-				isEdited(results.filePath, results.content, edited => {
-					resolveClose(win, edited, ext, results.content, performClose, closeCancelled)	
+				hasChanges(results.filePath, results.content, edited => {
+					resolveClose(win, edited, ext, results.content, closeAndCleanup, closeCancelled)	
 				})
 			
 			} else {
-				resolveClose(win, (results.content !== ""), ext, results.content, performClose, closeCancelled)
+				resolveClose(win, (results.content !== ""), ext, results.content, closeAndCleanup, closeCancelled)
 			}
 		})
 }
@@ -323,7 +332,7 @@ module.exports = {
 	fileExists: fileExists,
 	renameFile: null,
 	close: closeWindow,
-	fileIsEdited: isEdited,
+	fileIsEdited: hasChanges,
 	setCompareDocument: (docChanged) => {
 		documentChanged = docChanged
 	},

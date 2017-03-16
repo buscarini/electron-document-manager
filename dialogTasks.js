@@ -8,10 +8,11 @@ const showMessageBox = (message, buttonTasks, type) => {
 		dialog.showMessageBox({
 			type: "question",
 			buttons: _.map(buttonTasks, task => task.name),
-			message: "Your file was changed since saving the last time. Do you want to save before closing?"
+			message: message
 		}, resolve)
 	})
 	.chain(button => {
+		console.log("button pressed: " + JSON.stringify(button))
 		return buttonTasks[button].task
 	})
 }

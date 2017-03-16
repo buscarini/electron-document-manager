@@ -56,12 +56,16 @@ function createWindow(options) {
 
 	parameters = _.extend(parameters, { show: false })
 
+	console.log("DO CREATE THE WINDOW")
+	
 	// Create the browser window.
 	let win = null
 	win = new BrowserWindow(parameters)
-	win.once("ready-to-show", () => {
-		win.show()
-	})
+	win.show()
+	// win.once("ready-to-show", () => {
+	// 	console.log("SHOW THE WINDOW");
+	// 	win.show()
+	// })
 	
 	const minWidth = options.minWidth || 50
 	const minHeight = options.minHeight || 50
@@ -150,12 +154,20 @@ const createDocumentWindow = (properties, ext) => {
 	const createWin = (path, contents) => {
 		return new Task((reject, resolve) => {
 			fileManager.fileIsEdited(path, contents, isEdited => {
+
+				console.log("Check if file edited")
+				
 				if(win && !isEdited && contents === "") {
+
+					console.log("Open in current window")
+									
 					//open in current window
 					setUpWindow(win, path, contents)
 					resolve(win)
 				} else {
 
+					console.log("Create new window")
+					
 					const options = {
 						focusedWindow: win,
 						filePath: path,
@@ -193,10 +205,8 @@ const createDocumentWindow = (properties, ext) => {
 	
 	return Task.of(path)
 			.chain(fs.readFile)
-			.map(x => { console.log(x); return x })
 			.chain(contents => createWin(path, contents))
 			.orElse(x => Task.of(createWin(null, "")))
-			.map(x => { console.log(x); return x })
 			.chain(win => {
 				saveWindows()
 		
@@ -211,6 +221,8 @@ const createDocumentWindow = (properties, ext) => {
 }
 
 function setUpWindow(win, filePath, contents) {
+	console.log("setupWindow")
+	
 	if (filePath) {
 		containers = _.map(containers, c => {
 			if (c.window.id === win.id) {

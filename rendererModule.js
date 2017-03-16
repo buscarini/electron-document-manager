@@ -9,9 +9,22 @@ const requestId = name => "request-" + name
 let filePath = null,
 	setContent = null,
 	getContent = null,
-	notifyDocSaved = null
+	notifyDocSaved = null,
+	isEdited = false
+
+const updateEdited = edited => {
+	isEdited = edited
+	
+	const win = BrowserWindow.getFocusedWindow()
+	if (win) {
+		console.log("setting doc edited " + edited)
+		win.setDocumentEdited(edited)
+	}
+}
 
 ipcRenderer.on("set-content", function(event, content, callbackChannel) {
+	updateEdited(false)
+	
 	setContent(content.toString())
 	if(callbackChannel) ipcRenderer.send(callbackChannel)
 })
@@ -45,16 +58,12 @@ ipcRenderer.on(requestId("filepath_content"), function(event, callbackChannel) {
 	ipcRenderer.send(callbackChannel, { filePath: filePath, content: getContent() })
 })
 
-
+ipcRenderer.on(requestId("is_edited"), function(event, callbackChannel) {	
+	ipcRenderer.send(callbackChannel, isEdited)
+})
 
 module.exports = {
-	setEdited: function(edited) {
-		const win = BrowserWindow.getFocusedWindow()
-		if (win) {
-			console.log("setting doc edited " + edited)
-			win.setDocumentEdited(edited)
-		}
-	},
+	setEdited: updateEdited,
 	setContentSetter: function(fn) {
 		setContent = fn
 	},

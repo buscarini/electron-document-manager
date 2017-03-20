@@ -17,7 +17,6 @@ const updateEdited = edited => {
 	
 	const win = BrowserWindow.getFocusedWindow()
 	if (win) {
-		console.log("setting doc edited " + edited)
 		win.setDocumentEdited(edited)
 	}
 }
@@ -61,6 +60,13 @@ ipcRenderer.on(requestId("filepath_content"), function(event, callbackChannel) {
 ipcRenderer.on(requestId("is_edited"), function(event, callbackChannel) {	
 	ipcRenderer.send(callbackChannel, isEdited)
 })
+
+ipcRenderer.on("set_edited", function(event, edited, callbackChannel) {
+	console.log("Change isEdited to " + edited)
+	updateEdited(edited)
+	if(callbackChannel) ipcRenderer.send(callbackChannel)
+})
+
 
 module.exports = {
 	setEdited: updateEdited,

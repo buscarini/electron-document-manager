@@ -42,10 +42,18 @@ const askRenderer = property => win => {
 	})
 }
 
+const tellRenderer = property => value => win => {
+	return new Task((reject, resolve) => {
+		win.webContents.send(property, value)
+		console.log("told renderer property: " + property + " equals " + value)
+		resolve(property)
+	})
+}
+
 // requests filename and content from current browser window
 const getFilepathAndContent = askRenderer("filepath_content")
 const isWinDocumentEdited = askRenderer("is_edited")
-
+const setWinDocumentEdited = tellRenderer("set_edited")
 
 // OPEN get path to the file-to-open
 function userOpensHandler(filePath) {
@@ -159,7 +167,7 @@ const mergeContents = (filePath, fileContents, win, winContents) => {
 		win.webContents.send("set-content", fileContents)
 		resolve(fileContents)
 	})
-	const askWhat2Do = dialogTasks.ask("The file has been changedo on disk. Do you want to keep your changes, or reload the document?", [
+	const askWhat2Do = dialogTasks.ask("The file has been changed on disk. Do you want to keep your changes, or reload the document?", [
 		{ name: "Reload From Disk", task: reloadFromDisk },
 		{ name: "Keep My Changes", task: keepChanges }
 	])
@@ -227,6 +235,7 @@ const silentSaveTask = (win) => {
 			return fs.writeFile(results.filePath, results.content)
 				// .map(x => results)
 		})
+		.chain(x => setWinDocumentEdited(false)(win).map(result => x))
 		// .map(results => {
 // 			console.log("not writing file anymore")
 // 			writingFiles[results.filePath] = false
@@ -234,14 +243,14 @@ const silentSaveTask = (win) => {
 // 		})
 }
 
-const silentSave = (win, callback) => {
-	silentSaveTask(win)
-		.fork(err => {
-			callback(err, null)
-		}, path => {
-			callback(null, path)
-		})
-}
+// const silentSave = (win, callback) => {
+// 	silentSaveTask(win)
+// 		.fork(err => {
+// 			callback(err, null)
+// 		}, path => {
+// 			callback(null, path)
+// 		})
+// }
 
 const cleanup = win => {
 	if (win.watcher) { win.watcher.close() }
@@ -328,7 +337,6 @@ module.exports = {
 	openFile: userOpensHandler,
 	saveFile: userSavesHandler,
 	saveFileAs: userSaveAsHandler,
-	silentSave: silentSave,
 	fileExists: fileExists,
 	renameFile: null,
 	close: closeWindow,

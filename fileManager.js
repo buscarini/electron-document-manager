@@ -36,7 +36,6 @@ function hasChanges(filePath, content, completion) {
 const askRenderer = property => win => {
 	return new Task((reject, resolve) => {
 		ipcHelper.requestFromRenderer(win, property, (event, results) => {
-			console.log("asked renderer for property: " + property)
 			resolve(results)
 		})
 	})
@@ -45,7 +44,6 @@ const askRenderer = property => win => {
 const tellRenderer = property => value => win => {
 	return new Task((reject, resolve) => {
 		win.webContents.send(property, value)
-		console.log("told renderer property: " + property + " equals " + value)
 		resolve(property)
 	})
 }
@@ -73,7 +71,6 @@ function userOpensHandler(filePath) {
 		})
 	}
 	else {
-		console.log("Returning filepath " + filePath)
 		return Task.of(filePath)
 	}
 }
@@ -104,8 +101,6 @@ const checkNotNull = something => {
 const genericSaveOrSaveAs = (win, type, ext, callback) => {
 	
 	const translate = localize || id
-	
-	console.log("generic save or save as " + win.id)
 	
 	getFilepathAndContent(win)
 		.fork(console.error, results => {
@@ -163,7 +158,6 @@ const genericSaveOrSaveAs = (win, type, ext, callback) => {
 const mergeContents = (filePath, fileContents, win, winContents) => {
 	const keepChanges = silentSaveTask(win)
 	const reloadFromDisk = new Task((reject, resolve) => {
-		console.log("Reloading from disk")
 		win.webContents.send("set-content", fileContents)
 		resolve(fileContents)
 	})
@@ -178,16 +172,13 @@ const mergeContents = (filePath, fileContents, win, winContents) => {
 		
 	return isWinDocumentEdited(win)
 		.chain(edited => {
-			console.log("edited: " + JSON.stringify(edited))
 			return edited ? askWhat2Do : reloadFromDisk
 		})
 }
 
 const mergeChanges = (win, path) => {
 	return (Task.of(fileContents => pathAndContents => {
-						console.log("Merge changes")
 						return { fileContents: fileContents, winContents: pathAndContents.content }
-						// return mergeContents(path, fileContents, win, pathAndContents.content)
 					})
 					.ap(fs.readFile(path))
 					.ap(getFilepathAndContent(win))
@@ -204,13 +195,8 @@ const windowPathChanged = (win, filePath) => {
 			
 			if (writingFiles[filePath] === true) {
 				writingFiles[filePath] = false
-				console.log("Writing file, ignore changes")
 				return
 			}
-			
-			// TODO: see what to do here
-			// If the document hasn't changed, reload from disk. If it has changed, ask the user and loose changes or keep the memory changes and save to disk
-			console.log("FILE CHANGED")
 			
 			mergeChanges(win, path)
 				.fork(console.error, res => {
@@ -226,31 +212,14 @@ const windowPathChanged = (win, filePath) => {
 const silentSaveTask = (win) => {
 	return getFilepathAndContent(win)
 		.map(results => {
-			console.log("writing file")
 			writingFiles[results.filePath] = true
 			return results
 		})
 		.chain(results => {
-			console.log("silent save")
 			return fs.writeFile(results.filePath, results.content)
-				// .map(x => results)
 		})
 		.chain(x => setWinDocumentEdited(false)(win).map(result => x))
-		// .map(results => {
-// 			console.log("not writing file anymore")
-// 			writingFiles[results.filePath] = false
-// 			return results
-// 		})
 }
-
-// const silentSave = (win, callback) => {
-// 	silentSaveTask(win)
-// 		.fork(err => {
-// 			callback(err, null)
-// 		}, path => {
-// 			callback(null, path)
-// 		})
-// }
 
 const cleanup = win => {
 	if (win.watcher) { win.watcher.close() }

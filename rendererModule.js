@@ -62,7 +62,6 @@ ipcRenderer.on(requestId("is_edited"), function(event, callbackChannel) {
 })
 
 ipcRenderer.on("set_edited", function(event, edited, callbackChannel) {
-	console.log("Change isEdited to " + edited)
 	updateEdited(edited)
 	if(callbackChannel) ipcRenderer.send(callbackChannel)
 })

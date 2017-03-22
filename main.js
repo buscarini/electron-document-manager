@@ -31,6 +31,31 @@ const addRecentDocument = (doc) => {
 		.chain(updateMenu)
 }
 
+const openDocument = windowOptions => path => {
+	const ext = _.defaultTo(windowOptions.docExtension, "")
+	fileManager.openFile((path))
+		.fork(console.error, filePath => {
+			//check if open in other window
+			let windows = windowManager.getWindows()
+
+			const winForFile = _.reduce(windows, (winForFile, win) =>	{
+				return (win.filePath === filePath) ? win : winForFile
+			}, null)
+
+			if (winForFile) {
+				console.log("File already open. Focusing window")
+				winForFile.focus()
+			}
+			else {
+				console.log("Creating doc for opened document")
+				windowManager.createDocumentWindow(_.extend({ filePath: filePath }, windowOptions), ext, windowManager.saveWindows)
+					.map(x => { console.log(x); return x })
+					.chain(updateMenu)
+					.fork(console.error, console.log)
+			}
+		})
+}
+
 const createMenuOptions = (options) => {
 	console.log("menuOptions")
 	
@@ -45,27 +70,8 @@ const createMenuOptions = (options) => {
 							windowManager.createWindow(_.extend({ focusedWindow: focusedWindow, docExtension: ext }, windowOptions))
 						},
 						openMethod: function(item, focusedWindow, event, filePath) {
-								fileManager.openFile(filePath).fork(console.error, filePath => {
-										//check if open in other window
-										let windows = windowManager.getWindows()
-			
-										const winForFile = _.reduce(windows, (winForFile, win) =>	{
-											return (win.filePath === filePath) ? win : winForFile
-										}, null)
-
-										if (winForFile) {
-											console.log("File already open. Focusing window")
-											winForFile.focus()
-										}
-										else {
-											console.log("Creating doc for opened document")
-											windowManager.createDocumentWindow(_.extend({ filePath: filePath }, windowOptions), ext, windowManager.saveWindows)
-												.map(x => { console.log(x); return x })
-												.chain(updateMenu)
-												.fork(console.error, console.log)
-										}
-								})
-					},
+							openDocument(windowOptions)(filePath)
+						},
 						saveMethod: function(item, focusedWindow) {
 							fileManager.saveFile(ext, (err, path) => {
 								if (!err) {
@@ -139,10 +145,11 @@ let initialize = function(options) {
 		}
 	})
 	
-	app.on("open-file", function(e, filePath) {		
-		windowManager.createDocumentWindow(_.extend({ filePath: filePath }, windowOptions), ext)
-			.chain(updateMenu)
-			.fork(console.error, console.log)
+	app.on("open-file", function(e, filePath) {
+		openDocument(windowOptions)(filePath)
+		// windowManager.createDocumentWindow(_.extend({ filePath: filePath }, windowOptions), ext)
+		// 	.chain(updateMenu)
+		// 	.fork(console.error, console.log)
 	})
 
 	// This method will be called when Electron has finished

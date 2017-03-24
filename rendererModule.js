@@ -3,6 +3,7 @@
 const electron = require("electron")
 const ipcRenderer = electron.ipcRenderer
 const BrowserWindow = electron.remote.BrowserWindow
+const { blankString } = require("./utils")
 
 const requestId = name => "request-" + name
 
@@ -13,11 +14,15 @@ let filePath = null,
 	isEdited = false
 
 const updateEdited = edited => {
-	isEdited = edited
+	isEdited = blankString(filePath) ? true : edited
 	
-	const win = BrowserWindow.getFocusedWindow()
+	console.log("filePath: " + JSON.stringify(filePath))
+	console.log("isEdited: " + JSON.stringify(isEdited))
+	
+	const win = BrowserWindow.getFocusedWindow() || electron.remote.getCurrentWindow()
 	if (win) {
-		win.setDocumentEdited(edited)
+		console.log("setting document edited: " + JSON.stringify(isEdited))
+		win.setDocumentEdited(isEdited)
 	}
 }
 

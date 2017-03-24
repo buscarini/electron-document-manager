@@ -3,6 +3,7 @@ const electron = require("electron")
 const path = require("path")
 const Task = require("data.task")
 const R = require("ramda")
+const { Conjunction, mconcat } = require("fantasy-monoids")
 
 
 const removeExt = filePath => filePath.substr(0, filePath.lastIndexOf("."))
@@ -22,6 +23,20 @@ const checkNotNull = something => {
 	})
 }
 
+const isBasePath = basePath => path => {
+	const baseComponents = basePath.split(path.sep)
+	const pathComponents = path.split(path.sep)
+	
+	const xLens = R.lensProp('x')
+	
+	return R.pipe(
+		R.zip(baseComponents),
+		R.map((basePart, part) => Conjunction(R.equals(basePart, part))),
+		mconcat,
+		R.view(xLens)
+	)(pathComponents)
+}
+
 const baseTemporalPath = () => path.join(electron.app.getPath("userData"), "currentDocs")
 const temporalPath = id => path.join(baseTemporalPath(), id.toString())
 
@@ -35,6 +50,7 @@ module.exports = {
 	runTaskF,
 	runTask,
 	
+	isBasePath,
 	baseTemporalPath,
 	temporalPath,
 	

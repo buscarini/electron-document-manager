@@ -5,7 +5,7 @@ const app = electron.app
 const R = require("ramda")
 const BrowserWindow = electron.BrowserWindow
 const _ = require("lodash")
-const { windowTitle, runTask, temporalPath, blankString } = require("./utils")
+const { windowTitle, runTask, isBasePath, baseTemporalPath, temporalPath, blankString } = require("./utils")
 const fs = require("./fileTasks")
 
 const Immutable = require("immutable-ext")
@@ -151,7 +151,9 @@ const createDocumentWindow = (properties, ext) => {
     //not open, do the rest of the stuff
 	const win = BrowserWindow.getFocusedWindow()
 	
-	const isTemporal = blankString(properties.filePath)
+	const isTemporal = blankString(properties.filePath) // || isBasePath(baseTemporalPath, properties.filePath)
+	console.log("isTemporal: " + JSON.stringify(isTemporal))
+	
 	const path = isTemporal ? temporalPath(properties.id) : properties.filePath
 	
 	const createWin = (path, contents) => {
@@ -159,7 +161,7 @@ const createDocumentWindow = (properties, ext) => {
 			
 			const options = {
 				focusedWindow: win,
-				filePath: isTemporal ? path : null,
+				filePath: isTemporal ? null : path,
 				fileContent: contents,
 				x: properties.x,
 				y: properties.y,
@@ -173,57 +175,11 @@ const createDocumentWindow = (properties, ext) => {
 			const newWin = createWindow(options)
 
 			resolve(newWin)
-			
-			// fileManager.fileIsEdited(path, contents, isEdited => {
-			//
-			// 	console.log("Check if file edited")
-			//
-			// 	if(win && !isEdited && contents === "") {
-			//
-			// 		console.log("Open in current window")
-			//
-			// 		//open in current window
-			// 		setUpWindow(win, path, contents)
-			// 		resolve(win)
-			// 	} else {
-			//
-			// 		console.log("Create new window")
-			//
-			// 		const options = {
-			// 			focusedWindow: win,
-			// 			filePath: path,
-			// 			fileContent: contents,
-			// 			x: properties.x,
-			// 			y: properties.y,
-			// 			width: properties.width,
-			// 			height: properties.height,
-			// 			docExtension: ext,
-			// 			minWidth: properties.minWidth,
-			// 			minHeight: properties.minHeight
-			// 		}
-			//
-			// 		const newWin = createWindow(options)
-			//
-			// 		resolve(newWin)
-			// 	}
-			// })
 		})
 	}
 	
-	// let result = Task.of(null)
-	//
-	// if (path) {
-	// 	result = fs.readFile(path)
-	// 		.chain(contents => createWin(path, contents))
-	// }
-	// else {
-	// 	result = createWin(path, "")
-	// }
-	
-	
 	console.log("created window for doc " + path)
-	
-	
+		
 	return Task.of(path)
 			.chain(fs.readFile)
 			.chain(contents => createWin(path, contents))
@@ -233,7 +189,7 @@ const createDocumentWindow = (properties, ext) => {
 		
 				console.log("Before add recent doc. Path: " + path)
 		
-				if (typeof path === "string") {
+				if (R.is(String, path) && !isTemporal) {
 					return addRecentDoc(recentDocument(win, path))
 				}
 

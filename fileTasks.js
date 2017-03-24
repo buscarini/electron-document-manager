@@ -7,6 +7,24 @@ const pathIsValid = path => {
 	return (typeof path === "string" && path.length > 0)
 }
 
+const createDir = path => {
+	if (fs.existsSync(path)) {
+		return Task.of(path)
+	}
+	
+	return new Task((reject, resolve) => {	
+		fs.mkdir(path, err => {
+			console.log("finished mkdir " + err)
+			if (err) {
+				reject(err)
+			}
+			else {
+				resolve(path)
+			}
+		})
+	})
+}
+
 const readFile = path => {
 	return new Task((reject, resolve) => {
 		if (!pathIsValid(path)) {
@@ -42,13 +60,14 @@ const writeFile = (path, content) => {
 				reject(err)
 			}
 			else {
-				resolve(path)
+				resolve({ path, content })
 			}
 		})
 	})
 }
 
 module.exports = {
-	readFile: readFile,
-	writeFile: writeFile
+	createDir,
+	readFile,
+	writeFile
 }

@@ -12,7 +12,7 @@ const { id, runTaskF, runTask } = require("./utils")
 
 let userMenuOptions = null
 
-const { loadRecentDocs, addRecentDoc, clearRecentDocs } = require("./recentDocs")
+const { loadRecentDocs, addRecentDoc, clearRecentDocs, checkRecentDocument } = require("./recentDocs")
 
 let processMenu = null
 
@@ -32,9 +32,13 @@ const addRecentDocument = (doc) => {
 }
 
 const openDocument = windowOptions => path => {
+	console.log("Open Document")
+	
 	const ext = _.defaultTo(windowOptions.docExtension, "")
-	fileManager.openFile((path))
-		.fork(console.error, filePath => {
+	fileManager.openFile(path)
+		.fork(console.error, filePath => {			
+			console.log("Opened document")
+			
 			//check if open in other window
 			let windows = windowManager.getWindows()
 
@@ -51,7 +55,11 @@ const openDocument = windowOptions => path => {
 				windowManager.createDocumentWindow(_.extend({ filePath: filePath }, windowOptions), ext, windowManager.saveWindows)
 					.map(x => { console.log(x); return x })
 					.chain(updateMenu)
-					.fork(console.error, console.log)
+					.fork(err => {
+						checkRecentDocument(path)
+							.chain(updateMenu)
+							.fork(console.error, console.log)
+					}, console.log)
 			}
 		})
 }
@@ -146,10 +154,8 @@ let initialize = function(options) {
 	})
 	
 	app.on("open-file", function(e, filePath) {
+		console.log("open-file")
 		openDocument(windowOptions)(filePath)
-		// windowManager.createDocumentWindow(_.extend({ filePath: filePath }, windowOptions), ext)
-		// 	.chain(updateMenu)
-		// 	.fork(console.error, console.log)
 	})
 
 	// This method will be called when Electron has finished
@@ -160,7 +166,7 @@ let initialize = function(options) {
 		createMenuOptions(userMenuOptions).fork(console.error, menuManager.setMenu)
 		
 		//set up window menu updates - to be run on focus, blur, and window create
-		// windowManager.setFocusUpdateHandler(() => menuManager.updateMenu(menuOptions(userMenuOptions)) )
+		windowManager.setFocusUpdateHandler(() => updateMenu())
 
 		// Restore windows
 		windowManager.loadWindows(ext, windowOptions)

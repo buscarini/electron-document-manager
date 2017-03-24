@@ -5,7 +5,7 @@ const dialog = electron.dialog
 const BrowserWindow = electron.BrowserWindow
 const path = require("path")
 const ipcHelper = require("./ipcHelper")
-const { windowTitle, id } = require("./utils")
+const { windowTitle, id, blankString, baseTemporalPath, temporalPath } = require("./utils")
 const chokidar = require("chokidar")
 const dialogTasks = require("./dialogTasks")
 
@@ -138,8 +138,8 @@ const genericSaveOrSaveAs = (win, type, ext, callback) => {
 							.chain(filePath => fs.writeFile(filePath, results.content))
 							.fork(err => {
 								callback(err, filePath)
-							}, path => {
-								callback(null, path)
+							}, res => {
+								callback(null, res.path)
 							})							
 					}
 				)
@@ -148,8 +148,8 @@ const genericSaveOrSaveAs = (win, type, ext, callback) => {
 				fs.writeFile(results.filePath, results.content)
 					.fork(err => {
 						callback(err, results.filePath)
-					}, path => {
-						callback(null, path)
+					}, res => {
+						callback(null, res.path)
 					})	
 			}
 		})
@@ -225,7 +225,7 @@ const cleanup = win => {
 	if (win.watcher) { win.watcher.close() }
 }
 
-const closeWindow = (win, ext, performClose, closeCancelled) => {
+const closeWindow = (appIsQuitting, win, ext, performClose, closeCancelled) => {
 	
 	const closeAndCleanup = () => {
 		cleanup(win)
@@ -233,14 +233,28 @@ const closeWindow = (win, ext, performClose, closeCancelled) => {
 	}
 	
 	getFilepathAndContent(win)
-		.fork(console.error, (results) => {
-			if(results.filePath) {
-				hasChanges(results.filePath, results.content, edited => {
-					resolveClose(win, edited, ext, results.content, closeAndCleanup, closeCancelled)	
-				})
+		.fork(console.error, results => {
+			if (appIsQuitting && blankString(results.filePath)) {
+				// If has path and no changes, just close it, otherwise save it in a temporal path
+				fs.createDir(baseTemporalPath())
+					.chain(base => {
+						console.log("writing file to " + temporalPath(win.id))
+						return fs.writeFile(temporalPath(win.id), results.content)				
+					})
+					.fork(closeCancelled, res => {
+						console.log("closing")
+						closeAndCleanup()
+					})
+			}
+			else {
+				if(results.filePath) {
+					hasChanges(results.filePath, results.content, edited => {
+						resolveClose(win, edited, ext, results.content, closeAndCleanup, closeCancelled)	
+					})
 			
-			} else {
-				resolveClose(win, (results.content !== ""), ext, results.content, closeAndCleanup, closeCancelled)
+				} else {
+					resolveClose(win, (results.content !== ""), ext, results.content, closeAndCleanup, closeCancelled)
+				}				
 			}
 		})
 }

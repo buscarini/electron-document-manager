@@ -5,7 +5,7 @@ const app = electron.app
 const R = require("ramda")
 const BrowserWindow = electron.BrowserWindow
 const _ = require("lodash")
-const { windowTitle, runTask } = require("./utils")
+const { windowTitle, runTask, temporalPath, blankString } = require("./utils")
 const fs = require("./fileTasks")
 
 const Immutable = require("immutable-ext")
@@ -87,36 +87,37 @@ function createWindow(options) {
 		console.log("close " + win.id + " " + filePath)
 		e.preventDefault()
 		
-		fileManager.close(win, ext, (filePath) => {
+		// Ask the user if the doc file is not up to date
+		fileManager.close(appIsQuitting, win, ext, filePath => {
 			console.log("perform close " + win.id)
-			
+		
 			const doc = recentDocument(win, filePath)
 			addRecentDoc(doc)
 				.fork(console.error, console.log)
-			
+		
 			if (appIsQuitting) {
 				runTask(updateCurrentDoc(doc))
 			}
-			
+		
 			containers = _.filter(containers, container => container.id !== win.id)
 			if (win) {
 				win.hide()
 				win.destroy()
 				win = null
 			}
-			
+		
 			if (appIsQuitting && containers.length == 0) {
 				console.log("Try quitting again")
 				app.quit()
 			}
-			
+		
 			if (!appIsQuitting) {
 				saveWindows()
 			}
-			
 		}, () => {
 			appIsQuitting = false
 		})
+		
 	})
 	
 // 	win.on("closed", function() {
@@ -149,43 +150,63 @@ function createWindow(options) {
 const createDocumentWindow = (properties, ext) => {
     //not open, do the rest of the stuff
 	const win = BrowserWindow.getFocusedWindow()
-	const path = properties.filePath
+	
+	const isTemporal = blankString(properties.filePath)
+	const path = isTemporal ? temporalPath(properties.id) : properties.filePath
 	
 	const createWin = (path, contents) => {
 		return new Task((reject, resolve) => {
-			fileManager.fileIsEdited(path, contents, isEdited => {
+			
+			const options = {
+				focusedWindow: win,
+				filePath: isTemporal ? path : null,
+				fileContent: contents,
+				x: properties.x,
+				y: properties.y,
+				width: properties.width,
+				height: properties.height,
+				docExtension: ext,
+				minWidth: properties.minWidth,
+				minHeight: properties.minHeight
+			}
 
-				console.log("Check if file edited")
-				
-				if(win && !isEdited && contents === "") {
+			const newWin = createWindow(options)
 
-					console.log("Open in current window")
-									
-					//open in current window
-					setUpWindow(win, path, contents)
-					resolve(win)
-				} else {
-
-					console.log("Create new window")
-					
-					const options = {
-						focusedWindow: win,
-						filePath: path,
-						fileContent: contents,
-						x: properties.x,
-						y: properties.y,
-						width: properties.width,
-						height: properties.height,
-						docExtension: ext,
-						minWidth: properties.minWidth,
-						minHeight: properties.minHeight
-					}
-		
-					const newWin = createWindow(options)
-
-					resolve(newWin)
-				}
-			})
+			resolve(newWin)
+			
+			// fileManager.fileIsEdited(path, contents, isEdited => {
+			//
+			// 	console.log("Check if file edited")
+			//
+			// 	if(win && !isEdited && contents === "") {
+			//
+			// 		console.log("Open in current window")
+			//
+			// 		//open in current window
+			// 		setUpWindow(win, path, contents)
+			// 		resolve(win)
+			// 	} else {
+			//
+			// 		console.log("Create new window")
+			//
+			// 		const options = {
+			// 			focusedWindow: win,
+			// 			filePath: path,
+			// 			fileContent: contents,
+			// 			x: properties.x,
+			// 			y: properties.y,
+			// 			width: properties.width,
+			// 			height: properties.height,
+			// 			docExtension: ext,
+			// 			minWidth: properties.minWidth,
+			// 			minHeight: properties.minHeight
+			// 		}
+			//
+			// 		const newWin = createWindow(options)
+			//
+			// 		resolve(newWin)
+			// 	}
+			// })
 		})
 	}
 	

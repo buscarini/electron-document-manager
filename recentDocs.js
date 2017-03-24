@@ -1,9 +1,12 @@
 "use strict"
 const _ = require("lodash")
 const Task = require("data.task")
+const R = require("ramda")
 
 const electron = require("electron")
 const app = electron.app
+
+const fs = require("fs")
 
 const { preferences } = require("./preferences")
 
@@ -27,23 +30,33 @@ const clearRecentDocs = () => {
 	
 }
 
-const uniqueFilePath = items => {
-	return _.defaultTo(
-				_.uniqBy(
-					_.filter(items || [], doc => typeof doc === "object" && typeof doc.filePath === "string" && doc.filePath.length > 0),
-				"filePath")
-			, [])
-}
+const requireFilePath = items => _.filter(items || [], doc => typeof doc === "object" && typeof doc.filePath === "string" && doc.filePath.length > 0)
 
-const uniqueId = items => {
-	return _.defaultTo(
-			_.uniqBy(
-				_.filter(_.defaultTo(items, []), doc => typeof doc === "object" && typeof Number.isInteger(doc.id) && doc.id > 0),
-				"id")
-			, [])
-}
+const uniqueFilePath = R.pipe(
+						R.uniqBy(item => item.filePath),
+						R.defaultTo([])
+					)
 
-const cleanRecentDocs = uniqueFilePath
+const requireId = items => _.filter(items || [], doc => typeof doc === "object" && Number.isInteger(doc.id) && doc.id > 0)
+
+const uniqueId = R.pipe(
+						R.uniqBy(item => item.id),
+						R.defaultTo([])
+					)
+
+const removeNotExisting = R.filter(doc => R.is(String, doc.filePath) && fs.exists(doc.filePath))
+
+const cleanRecentDocs = R.pipe(
+							requireFilePath,
+							uniqueFilePath,
+							removeNotExisting
+						)
+
+const cleanCurrentDocs = R.pipe(
+		uniqueFilePath,
+		requireId,
+		uniqueId
+	)
 
 const loadRecentDocs = () => {
 	return new Task((reject, resolve) => {
@@ -94,10 +107,6 @@ const addRecentDoc = (doc) => {
 		.map(docs => doc)
 }
 
-const cleanCurrentDocs = docs => {
-	return uniqueId(uniqueFilePath(docs))
-}
-
 const loadCurrentDocs = () => {
 	console.log("load current docs")
 	return new Task((reject, resolve) => {
@@ -142,12 +151,7 @@ const updateCurrentDoc = doc => {
 	}
 	
 	return loadCurrentDocs()
-		.map(docs => {
-			console.log("loaded current docs: " + JSON.stringify(docs))
-			return docs
-		})
 		.map(savedDocs => {
-			
 			const index = _.findIndex(savedDocs, saved => saved.id === doc)
 			if (index === -1) {
 				return _.concat(savedDocs, doc)
@@ -160,6 +164,15 @@ const updateCurrentDoc = doc => {
 		.chain(saveCurrentDocs)
 }
 
+const checkRecentDocument = path => {
+	if (fs.exists(path)) {
+		return Task.empty()
+	}
+	
+	return loadCurrentDocs
+		.chain(saveCurrentDocs)
+}
+
 module.exports = {
 	loadRecentDocs,
 	saveRecentDocs,
@@ -167,6 +180,7 @@ module.exports = {
 	clearRecentDocs,
 	loadCurrentDocs,
 	saveCurrentDocs,
-	updateCurrentDoc
+	updateCurrentDoc,
+	checkRecentDocument
 }
 

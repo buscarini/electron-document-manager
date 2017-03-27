@@ -17,11 +17,25 @@ const showMessageBox = (message, buttonTasks, type) => {
 	})
 }
 
+const saveDialog = filters => {
+	return new Task((reject, resolve) => {
+		dialog.showSaveDialog({ filters: filters }, filePath => {
+			if (filePath) {
+				resolve(filePath)
+			}
+			else {
+				reject("User cancelled")
+			}
+		})
+	})
+}
+
 const ask = (message, buttonTasks) => {
 	return showMessageBox(message, buttonTasks, "question")
 }
 
 module.exports = {
 	showMessageBox,
-	ask
+	ask,
+	saveDialog
 }

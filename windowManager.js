@@ -5,14 +5,14 @@ const app = electron.app
 const R = require("ramda")
 const BrowserWindow = electron.BrowserWindow
 const _ = require("lodash")
-const { windowTitle, runTask, isBasePath, baseTemporalPath, temporalPath, blankString } = require("./utils")
+const { windowTitle, runTask, temporalPath, blankString } = require("./utils")
 const fs = require("./fileTasks")
 
 const Immutable = require("immutable-ext")
 const Task = require("data.task")
 
 const fileManager = require("./fileManager")
-const { addRecentDoc, loadCurrentDocs, saveCurrentDocs, updateCurrentDoc } = require("./recentDocs")
+const { addRecentDoc, loadCurrentDocs, saveCurrentDocs, updateCurrentDoc, recentDocument } = require("./recentDocs")
 
 const Container = (win, path) => {
 	return {
@@ -93,6 +93,7 @@ function createWindow(options) {
 		
 			const doc = recentDocument(win, filePath)
 			addRecentDoc(doc)
+				.chain(updateCurrentDoc)
 				.fork(console.error, console.log)
 		
 			if (appIsQuitting) {
@@ -237,26 +238,6 @@ const loadWindows = (ext, options) => {
 					}			
 				})
 		})
-}
-
-const recentDocumentForWin = win => {
-	return {
-			id: win.id,
-			x: win.getBounds().x,
-			y: win.getBounds().y,
-			width: win.getBounds().width,
-			height: win.getBounds().height
-	}
-}
-
-const recentDocumentForPath = path => {
-	return {
-		filePath: path
-	}
-}
-
-const recentDocument = (win, path) => {
-	return Object.assign(recentDocumentForWin(win), recentDocumentForPath(path))
 }
 
 const loadProperties = () => {

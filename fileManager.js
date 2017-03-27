@@ -8,6 +8,7 @@ const ipcHelper = require("./ipcHelper")
 const { windowTitle, id, blankString, baseTemporalPath, temporalPath } = require("./utils")
 const chokidar = require("chokidar")
 const dialogTasks = require("./dialogTasks")
+const { recentDocument, updateCurrentDoc } = require("./recentDocs")
 
 let fs = require("./fileTasks")
 
@@ -79,7 +80,14 @@ function userOpensHandler(filePath) {
 
 const userSavesHandler = (ext, callback) => {
 	const win = BrowserWindow.getFocusedWindow()
-	genericSaveOrSaveAs(win, "save", ext, callback)
+	genericSaveOrSaveAs(win, "save", ext)
+		.fork(err => {
+			console.error("Can't close window: Error saving. " + err)
+			callback(err, null)
+		}, res => {
+			console.log("closing after saved")
+			callback(null, res)
+		})
 }
 
 const userSaveAsHandler = (ext, callback) => {
@@ -87,71 +95,50 @@ const userSaveAsHandler = (ext, callback) => {
 	genericSaveOrSaveAs(win, "save-as", ext, callback)
 }
 
-const checkNotNull = something => {
-	return new Task((reject, resolve) => {
-		if (something) {
-			resolve(something)
-		}
-		else {
-			reject("Error")
-		}
-	})
-}
-
-const genericSaveOrSaveAs = (win, type, ext, callback) => {
+const genericSaveOrSaveAs = (win, type, ext) => {
 	
 	const translate = localize || id
 	
-	getFilepathAndContent(win)
-		.fork(console.error, results => {
-			if (type === "save-as" || !results.filePath) {
-				dialog.showSaveDialog({
-						filters: [
-							{name: "OneModel", extensions: ["onemodel"]},
-							{name: translate("All Files"), extensions: ["*"]}
-						]
-					},
-					function(filePath) {
-						Task.of(filePath)
-							.chain(checkNotNull)
-							.map(filePath => {
-								if (path.extname(filePath).length == 0 && ext.length > 0) {
-									return filePath + "." + ext
-								}
-								else {
-									return path
-								}
+	return getFilepathAndContent(win)
+		.chain(results => {
+			if (type === "save-as" || blankString(results.filePath)) {
+				return dialogTasks.saveDialog([
+						{name: "OneModel", extensions: ["onemodel"]},
+						{name: translate("All Files"), extensions: ["*"]}
+					])
+					.chain(filePath => blankString(filePath) ? Task.empty() : Task.of(filePath))
+					.map(filePath => {
+						if (path.extname(filePath).length == 0 && ext.length > 0) {
+							return filePath + "." + ext
+						}
+						else {
+							return path
+						}
+					})
+					.chain(filePath => {
+						return new Task((reject, resolve) => {
+							setImmediate(function() { //wait a tick so that dialog goes away and window focused again
+								const win = BrowserWindow.getFocusedWindow()
+								win.setRepresentedFilename(filePath)
+								win.setTitle(windowTitle(filePath))
+								// win.filePath = filePath
+								windowPathChanged(win, filePath)
+								// win.webContents.send("set-filepath", filePath)
+								resolve(filePath)
 							})
-							.chain(filePath => {
-								return new Task((reject, resolve) => {
-									setImmediate(function() { //wait a tick so that dialog goes away and window focused again
-										const win = BrowserWindow.getFocusedWindow()
-										win.setRepresentedFilename(filePath)
-										win.setTitle(windowTitle(filePath))
-										// win.filePath = filePath
-										windowPathChanged(win, filePath)
-										// win.webContents.send("set-filepath", filePath)
-										resolve(filePath)
-									})
-								})
-							})
-							.chain(filePath => fs.writeFile(filePath, results.content))
-							.fork(err => {
-								callback(err, filePath)
-							}, res => {
-								callback(null, res.path)
-							})							
-					}
-				)
+						})
+					})
+					.map(filePath => { return { filePath: filePath, content: results.content }})
 			}
 			else {
-				fs.writeFile(results.filePath, results.content)
-					.fork(err => {
-						callback(err, results.filePath)
-					}, res => {
-						callback(null, res.path)
-					})	
+				return Task.of(results)
 			}
+		})
+		.chain(results => fs.writeFile(results.filePath, results.content))
+		.map(res => res.path)
+		.chain(path => {
+			const doc = recentDocument(win, path)
+			return updateCurrentDoc(doc).map(x => path)
 		})
 }
 
@@ -234,6 +221,7 @@ const closeWindow = (appIsQuitting, win, ext, performClose, closeCancelled) => {
 	
 	getFilepathAndContent(win)
 		.fork(console.error, results => {
+			
 			if (appIsQuitting && blankString(results.filePath)) {
 				// If has path and no changes, just close it, otherwise save it in a temporal path
 				fs.createDir(baseTemporalPath())
@@ -246,17 +234,19 @@ const closeWindow = (appIsQuitting, win, ext, performClose, closeCancelled) => {
 						closeAndCleanup()
 					})
 			}
-			else {
-				if(results.filePath) {
-					hasChanges(results.filePath, results.content, edited => {
+			else if (!blankString(results.filePath)) {
+				isWinDocumentEdited(win)
+					.fork(console.error, edited => {
+						console.log("has filepath")
+						console.log("edited: " + JSON.stringify(edited))
 						resolveClose(win, edited, ext, results.content, closeAndCleanup, closeCancelled)	
 					})
-			
-				} else {
+			}
+			else {
+					console.log("no filepath")
 					resolveClose(win, (results.content !== ""), ext, results.content, closeAndCleanup, closeCancelled)
 				}				
-			}
-		})
+			})
 }
 
 const resolveClose = (win, edited, ext, content, performClose, closeCancelled) => {
@@ -275,15 +265,13 @@ const resolveClose = (win, edited, ext, content, performClose, closeCancelled) =
 		performClose()
 		
 	} else if(!edited && content !== "") {
-		genericSaveOrSaveAs(win, "save", ext, function(err, filePath) {
-			if (err) {
-				console.log("Can't close window: Error saving. " + err)
-			}
-			else {
+		genericSaveOrSaveAs(win, "save", ext)
+			.fork(err => {
+				console.error("Can't close window: Error saving. " + err)	
+			}, res => {
 				console.log("closing after saved")
 				performClose()
-			}
-		})
+			})
 	} else {		
 		// confirm with dialog
 		let button = dialog.showMessageBox({
@@ -293,15 +281,13 @@ const resolveClose = (win, edited, ext, content, performClose, closeCancelled) =
 		})
 
 		if (button === 0) { //SAVE
-			genericSaveOrSaveAs(win, "save", ext, function(err, filePath) {
-				if (err) {
-					console.log("Can't close window: Error saving. " + err)
-				}
-				else {
+			genericSaveOrSaveAs(win, "save", ext)
+				.fork(err => {
+					console.error("Can't close window: Error saving. " + err)	
+				}, res => {
 					console.log("closing after saved")
-					performClose(filePath)
-				}
-			})
+					performClose()
+				})
 		} else if (button === 1) { //DISCARD
 			console.log("Discard save")			
 			performClose(null)

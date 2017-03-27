@@ -9,6 +9,7 @@ const app = electron.app
 const fs = require("fs")
 
 const { preferences } = require("./preferences")
+const { blankString } = require("./utils")
 
 const recentFilesKey = "document_recentFiles"
 const currentFilesKey = "document_currentFiles"
@@ -40,7 +41,15 @@ const uniqueFilePath = R.pipe(
 const requireId = items => _.filter(items || [], doc => typeof doc === "object" && Number.isInteger(doc.id) && doc.id > 0)
 
 const uniqueId = R.pipe(
-						R.uniqBy(item => item.id),
+						R.groupBy(item => item.id.toString()),
+						R.mapObjIndexed((items, id, obj) => R.reduce((acc, item) => {
+								return acc === null ? item : (
+									blankString(acc.filePath) ? item : acc
+								)
+							}, null)(items)
+						),
+						R.values,
+						R.reject(R.isNil),
 						R.defaultTo([])
 					)
 
@@ -53,6 +62,7 @@ const cleanRecentDocs = R.pipe(
 						)
 
 const cleanCurrentDocs = R.pipe(
+		R.reject(R.isNil),
 		uniqueFilePath,
 		requireId,
 		uniqueId
@@ -173,6 +183,26 @@ const checkRecentDocument = path => {
 		.chain(saveCurrentDocs)
 }
 
+const recentDocumentForWin = win => {
+	return {
+			id: win.id,
+			x: win.getBounds().x,
+			y: win.getBounds().y,
+			width: win.getBounds().width,
+			height: win.getBounds().height
+	}
+}
+
+const recentDocumentForPath = path => {
+	return {
+		filePath: path
+	}
+}
+
+const recentDocument = (win, path) => {
+	return Object.assign(recentDocumentForWin(win), recentDocumentForPath(path))
+}
+
 module.exports = {
 	loadRecentDocs,
 	saveRecentDocs,
@@ -181,6 +211,7 @@ module.exports = {
 	loadCurrentDocs,
 	saveCurrentDocs,
 	updateCurrentDoc,
-	checkRecentDocument
+	checkRecentDocument,
+	recentDocument
 }
 

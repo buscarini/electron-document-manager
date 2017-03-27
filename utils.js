@@ -27,7 +27,7 @@ const isBasePath = basePath => path => {
 	const baseComponents = basePath.split(path.sep)
 	const pathComponents = path.split(path.sep)
 	
-	const xLens = R.lensProp('x')
+	const xLens = R.lensProp("x")
 	
 	return R.pipe(
 		R.zip(baseComponents),

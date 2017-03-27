@@ -16,12 +16,8 @@ let filePath = null,
 const updateEdited = edited => {
 	isEdited = blankString(filePath) ? true : edited
 	
-	console.log("filePath: " + JSON.stringify(filePath))
-	console.log("isEdited: " + JSON.stringify(isEdited))
-	
 	const win = BrowserWindow.getFocusedWindow() || electron.remote.getCurrentWindow()
 	if (win) {
-		console.log("setting document edited: " + JSON.stringify(isEdited))
 		win.setDocumentEdited(isEdited)
 	}
 }

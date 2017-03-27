@@ -9,14 +9,16 @@ const { windowTitle, id, blankString, baseTemporalPath, temporalPath } = require
 const chokidar = require("chokidar")
 const dialogTasks = require("./dialogTasks")
 const { recentDocument, updateCurrentDoc } = require("./recentDocs")
+const R = require("ramda")
 
 let fs = require("./fileTasks")
+let nodeFs = require("fs")
 
 const Task = require("data.task")
 
 let writingFiles = {}
 
-const fileExists = fs.existsSync
+const fileExists = nodeFs.existsSync
 
 let localize
 let documentChanged = (saved, current) => saved !== current
@@ -95,6 +97,13 @@ const userSaveAsHandler = (ext, callback) => {
 	genericSaveOrSaveAs(win, "save-as", ext, callback)
 }
 
+const askOverwrite = (filePath) => {
+	return dialogTasks.ask("This file already exists. Do you want to overwrite it?", [
+			{ name: "Cancel", task: Task.empty() },
+			{ name: "Overwrite", task: Task.of(filePath) }
+		])
+}
+
 const genericSaveOrSaveAs = (win, type, ext) => {
 	
 	const translate = localize || id
@@ -106,6 +115,7 @@ const genericSaveOrSaveAs = (win, type, ext) => {
 						{name: "OneModel", extensions: ["onemodel"]},
 						{name: translate("All Files"), extensions: ["*"]}
 					])
+					.map(R.tap(console.log))
 					.chain(filePath => blankString(filePath) ? Task.empty() : Task.of(filePath))
 					.map(filePath => {
 						if (path.extname(filePath).length == 0 && ext.length > 0) {
@@ -115,6 +125,8 @@ const genericSaveOrSaveAs = (win, type, ext) => {
 							return path
 						}
 					})
+					.map(R.tap(console.log))
+					.chain(filePath => fileExists(filePath) ? askOverwrite(filePath) : Task.of(filePath))
 					.chain(filePath => {
 						return new Task((reject, resolve) => {
 							setImmediate(function() { //wait a tick so that dialog goes away and window focused again

@@ -142,15 +142,12 @@ function createWindow(options) {
 		win.webContents.openDevTools()
 	}
 	
-	
-	saveWindows()
-	
 	return win
 }
 
 const createDocumentWindow = (properties, ext) => {
     //not open, do the rest of the stuff
-	const win = BrowserWindow.getFocusedWindow()
+	const focused = BrowserWindow.getFocusedWindow()
 	
 	const isTemporal = blankString(properties.filePath) // || isBasePath(baseTemporalPath, properties.filePath)
 	console.log("isTemporal: " + JSON.stringify(isTemporal))
@@ -161,7 +158,7 @@ const createDocumentWindow = (properties, ext) => {
 		return new Task((reject, resolve) => {
 			
 			const options = {
-				focusedWindow: win,
+				focusedWindow: focused,
 				filePath: isTemporal ? null : path,
 				fileContent: contents,
 				x: properties.x,
@@ -235,7 +232,7 @@ const loadWindows = (ext, options) => {
 					const windows = _.filter(results.toArray(), win => win != null)
 					if (windows.length === 0) {
 						createWindow(_.extend({ docExtension: ext }, options))
-					}			
+					}
 				})
 		})
 }

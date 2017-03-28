@@ -66,8 +66,22 @@ const writeFile = (path, content) => {
 	})
 }
 
+const removeFile = (path) => {
+	return new Task((reject, resolve) => {
+		fs.unlink(path, err => {
+			if (err) {
+				reject(err)
+			}
+			else {
+				resolve(path)
+			}
+		})
+	})
+}
+
 module.exports = {
 	createDir,
 	readFile,
-	writeFile
+	writeFile,
+	removeFile
 }

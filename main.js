@@ -81,6 +81,7 @@ const createMenuOptions = (options) => {
 							openDocument(windowOptions)(filePath)
 						},
 						saveMethod: function(item, focusedWindow) {
+							console.log("SAVE")
 							fileManager.saveFile(ext, (err, path) => {
 								if (!err) {
 							focusedWindow.webContents.send("document_saved", path)

@@ -36,6 +36,7 @@ function hasChanges(filePath, content, completion) {
 	}
 }
 
+// RENDERER COMMUNICATION
 const askRenderer = property => win => {
 	return new Task((reject, resolve) => {
 		ipcHelper.requestFromRenderer(win, property, (event, results) => {
@@ -55,6 +56,10 @@ const tellRenderer = property => value => win => {
 const getFilepathAndContent = askRenderer("filepath_content")
 const isWinDocumentEdited = askRenderer("is_edited")
 const setWinDocumentEdited = tellRenderer("set_edited")
+
+const removeTemporalFile = win => {
+	return fs.removeFile(temporalPath(win.id))
+}
 
 // OPEN get path to the file-to-open
 function userOpensHandler(filePath) {
@@ -81,6 +86,7 @@ function userOpensHandler(filePath) {
 // SAVE
 
 const userSavesHandler = (ext, callback) => {
+	console.log("Getting focused window")
 	const win = BrowserWindow.getFocusedWindow()
 	genericSaveOrSaveAs(win, "save", ext)
 		.fork(err => {
@@ -103,6 +109,8 @@ const askOverwrite = (filePath) => {
 			{ name: "Overwrite", task: Task.of(filePath) }
 		])
 }
+
+
 
 const genericSaveOrSaveAs = (win, type, ext) => {
 	
@@ -140,6 +148,7 @@ const genericSaveOrSaveAs = (win, type, ext) => {
 							})
 						})
 					})
+					.chain(filePath => removeTemporalFile(win).map(x => filePath))
 					.map(filePath => { return { filePath: filePath, content: results.content }})
 			}
 			else {

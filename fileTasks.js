@@ -70,6 +70,7 @@ const removeFile = (path) => {
 	return new Task((reject, resolve) => {
 		fs.unlink(path, err => {
 			if (err) {
+				console.log("Error removing file")
 				reject(err)
 			}
 			else {
@@ -79,9 +80,19 @@ const removeFile = (path) => {
 	})
 }
 
+const removeFileIfExists = path => {
+	if (!fs.existsSync(path)) {
+		return Task.of(path)
+	}
+	else {
+		return removeFile(path)
+	}
+}
+
 module.exports = {
 	createDir,
 	readFile,
 	writeFile,
-	removeFile
+	removeFile,
+	removeFileIfExists
 }

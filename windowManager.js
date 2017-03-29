@@ -15,22 +15,15 @@ const fileManager = require("./fileManager")
 const { addRecentDoc, loadCurrentDocs, saveCurrentDocs, updateCurrentDoc, recentDocument } = require("./recentDocs")
 
 const { Doc, guidLens, filePathLens } = require("./document")
+const documentManager = require("./documentManager")
 
-let documents = []
+// let documents = []
 let untitledIndex = 1
 let indexFile
 let openDevTools
 let appIsQuitting = false
 
 let focusUpdateHandler = null
-
-const getWindowDocument = (win) => {
-	if (R.isNil(win)) {
-		return null
-	}
-		
-	return R.find(R.propEq("id", win.id), documents)
-}
 
 function createWindow(options) {
 	options = options || {}
@@ -79,7 +72,8 @@ function createWindow(options) {
 	win.setMinimumSize(minWidth, minHeight)
 	
 	const container = Doc(win, path, guid)
-	documents.push(container)
+	// documents.push(container)
+	documentManager.addDocument(container)
 
 	// and load the index.html of the app.
 	win.loadURL(indexFile)
@@ -96,23 +90,27 @@ function createWindow(options) {
 		fileManager.close(appIsQuitting, win, ext, filePath => {
 			console.log("perform close " + win.id)
 		
-			const doc = getWindowDocument(win)
-			addRecentDoc(doc)
-				.chain(updateCurrentDoc)
-				.fork(console.error, console.log)
+			const doc = documentManager.getWindowDocument(win)
+			runTask(addRecentDoc(doc)
+				.chain(updateCurrentDoc))
 		
-			if (appIsQuitting) {
-				runTask(updateCurrentDoc(doc))
-			}
+			// if (appIsQuitting) {
+// 				runTask(updateCurrentDoc(doc))
+// 			}
+	
+			console.log("docs: " + JSON.stringify(documentManager.getDocuments().length))
 		
-			documents = _.filter(documents, container => container.id !== win.id)
+			documentManager.removeDocument(win.id)
+			// documents = _.filter(documents, container => container.id !== win.id)
 			if (win) {
 				win.hide()
 				win.destroy()
 				win = null
 			}
 		
-			if (appIsQuitting && documents.length == 0) {
+			console.log("docs: " + JSON.stringify(documentManager.getDocuments().length))
+		
+			if (appIsQuitting && documentManager.getDocuments().length == 0) {
 				console.log("Try quitting again")
 				app.quit()
 			}
@@ -208,12 +206,14 @@ function setUpWindow(win, filePath, contents) {
 	console.log("setupWindow")
 	
 	if (filePath) {
-		documents = _.map(documents, c => {
-			if (c.window.id === win.id) {
-				c.path = filePath
-			}
-			return c
-		})
+		documentManager.updateDocumentPath(win.id, filePath)
+		
+		// documents = _.map(documents, c => {
+		// 	if (c.window.id === win.id) {
+		// 		c.path = filePath
+		// 	}
+		// 	return c
+		// })
 		
 		fileManager.windowPathChanged(win, filePath)
 		// win.webContents.send("set-filepath", filePath)
@@ -246,7 +246,7 @@ const loadWindows = (ext, options) => {
 }
 
 const saveWindows = () => {
-	saveCurrentDocs(documents)
+	saveCurrentDocs(documentManager.getDocuments())
 		.fork(console.error, console.log)
 }
 
@@ -267,13 +267,12 @@ module.exports = {
 	windowCloseCancelled: () => {
 		appIsQuitting = false
 	},
-	getWindowDocuments: function() { return documents },
-	getWindows: function() { return _.map(documents, c => c.window) },
 	setQuitting: function(isQuitting) {
 		appIsQuitting = isQuitting
 	},
-	
-	getWindowDocument: getWindowDocument,
+	getWindowDocuments: documentManager.getDocuments,
+	getWindows: documentManager.getWindows,
+	getWindowDocument: documentManager.getWindowDocument,
 	saveWindows: saveWindows,
 	loadWindows: loadWindows
 }

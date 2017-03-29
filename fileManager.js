@@ -3,19 +3,21 @@
 const electron = require("electron")
 const dialog = electron.dialog
 const BrowserWindow = electron.BrowserWindow
+const R = require("ramda")
 const path = require("path")
+const chokidar = require("chokidar")
+let nodeFs = require("fs")
+const Task = require("data.task")
+
 const ipcHelper = require("./ipcHelper")
 const { windowTitle, id, blankString, baseTemporalPath, temporalPath } = require("./utils")
-const chokidar = require("chokidar")
 const dialogTasks = require("./dialogTasks")
 const { updateCurrentDoc } = require("./recentDocs")
 const { guidLens } = require("./document")
-const R = require("ramda")
+const documentManager = require("./documentManager")
 
 let fs = require("./fileTasks")
-let nodeFs = require("fs")
 
-const Task = require("data.task")
 
 let writingFiles = {}
 
@@ -101,7 +103,14 @@ const userSavesHandler = (ext, callback) => {
 
 const userSaveAsHandler = (ext, callback) => {
 	const win = BrowserWindow.getFocusedWindow()
-	genericSaveOrSaveAs(win, "save-as", ext, callback)
+	genericSaveOrSaveAs(win, "save-as", ext)
+		.fork(err => {
+			console.error("Can't close window: Error saving. " + err)
+			callback(err, null)
+		}, res => {
+			console.log("closing after saved")
+			callback(null, res)
+		})	
 }
 
 const askOverwrite = (filePath) => {
@@ -117,9 +126,7 @@ const genericSaveOrSaveAs = (win, type, ext) => {
 	
 	const translate = localize || id
 	
-	const windowManager = require("./windowManager")
-	
-	const doc = windowManager.getWindowDocument(win)
+	const doc = documentManager.getWindowDocument(win)
 	const guid = R.view(guidLens, doc)
 	
 	return getFilepathAndContent(win)
@@ -254,15 +261,9 @@ const closeWindow = (appIsQuitting, win, ext, performClose, closeCancelled) => {
 				// If has path and no changes, just close it, otherwise save it in a temporal path
 				fs.createDir(baseTemporalPath())
 					.chain(base => {
-						
-						console.log("Created temporal path")
-						
-						const windowManager = require("./windowManager")
-
 						return R.pipe(
-							windowManager.getWindowDocument,
+							documentManager.getWindowDocument,
 							R.view(guidLens),
-							R.tap(console.log),
 							temporalPath,
 							R.tap(console.log),
 							R.curry(fs.writeFile)(R.__, results.content)
@@ -291,6 +292,15 @@ const closeWindow = (appIsQuitting, win, ext, performClose, closeCancelled) => {
 			})
 }
 
+// discardWindowDocument :: win => Task(path)
+const discardWindowDocument = R.pipe(
+		documentManager.getWindowDocument,
+		R.view(guidLens),
+		temporalPath,
+		R.tap(console.log),
+		fs.removeFileIfExists
+	)
+
 const resolveClose = (win, edited, ext, content, performClose, closeCancelled) => {
 	/*
 		We want to immediately close if:          it has no content and hasn"t been edited
@@ -298,47 +308,66 @@ const resolveClose = (win, edited, ext, content, performClose, closeCancelled) =
 		We want to ask if:                        it has been edited
 	*/
 	
+	const performCloseTask = (x) => {
+		return new Task((reject, resolve) => {
+			// closing after user decided
+			performClose()
+			return resolve(x)
+		})
+	}
+	
 	console.log("resolve close. Edited " + edited)
 	
-	const translate = localize || id
-
+	const translate = localize || id	
+	
+	const saveTask = genericSaveOrSaveAs(win, "save", ext).chain(performCloseTask)
+	
 	if(!edited && content === "") {
 		// BrowserWindow.getFocusedWindow().close()
 		performClose()
 		
-	} else if(!edited && content !== "") {
-		genericSaveOrSaveAs(win, "save", ext)
-			.fork(err => {
+	} else if(!edited && content !== "") { // See if we really need to save here
+		saveTask.fork(err => {
 				console.error("Can't close window: Error saving. " + err)	
 			}, res => {
 				console.log("closing after saved")
-				performClose()
 			})
 	} else {		
 		// confirm with dialog
-		let button = dialog.showMessageBox({
-			type: "question",
-			buttons: [ translate("Save changes"), translate("Discard changes"), translate("Cancel")],
-			message: translate("Your file was changed since saving the last time. Do you want to save before closing?")
-		})
+		
+		dialogTasks.ask(translate("Your file was changed since saving the last time. Do you want to save before closing?"),
+			[
+				{ name: translate("Save changes"), task: saveTask },
+				{ name: translate("Discard changes"), task: discardWindowDocument(win).chain(performCloseTask) },
+				{ name: translate("Cancel"), task: Task.of("cancelled").map(x => {
+					closeCancelled()
+					return x
+				}) }
+			])
+			.fork(err => {
+				console.error("Can't close window: Error saving. " + err)	
+			}, res => {
+				// console.log("// closing after user decided")
+			})
+	}		
 
-		if (button === 0) { //SAVE
-			genericSaveOrSaveAs(win, "save", ext)
-				.fork(err => {
-					console.error("Can't close window: Error saving. " + err)	
-				}, res => {
-					console.log("closing after saved")
-					performClose()
-				})
-		} else if (button === 1) { //DISCARD
-			console.log("Discard save")			
-			performClose(null)
-		} else {
-			//CANCEL - do nothing
-			console.log("cancel close")
-			closeCancelled()
-		}
-	}
+		// if (button === 0) { //SAVE
+// 			genericSaveOrSaveAs(win, "save", ext)
+// 				.fork(err => {
+// 					console.error("Can't close window: Error saving. " + err)
+// 				}, res => {
+// 					console.log("closing after saved")
+// 					performClose()
+// 				})
+// 		} else if (button === 1) { //DISCARD
+// 			console.log("Discard save")
+// 			performClose(null)
+// 		} else {
+// 			//CANCEL - do nothing
+// 			console.log("cancel close")
+// 			closeCancelled()
+// 		}
+//	 }
 }
 
 module.exports = {

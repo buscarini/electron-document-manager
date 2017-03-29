@@ -8,7 +8,8 @@ const ipcHelper = require("./ipcHelper")
 const { windowTitle, id, blankString, baseTemporalPath, temporalPath } = require("./utils")
 const chokidar = require("chokidar")
 const dialogTasks = require("./dialogTasks")
-const { recentDocument, updateCurrentDoc } = require("./recentDocs")
+const { updateCurrentDoc } = require("./recentDocs")
+const { guidLens } = require("./document")
 const R = require("ramda")
 
 let fs = require("./fileTasks")
@@ -57,8 +58,8 @@ const getFilepathAndContent = askRenderer("filepath_content")
 const isWinDocumentEdited = askRenderer("is_edited")
 const setWinDocumentEdited = tellRenderer("set_edited")
 
-const removeTemporalFile = win => {
-	return fs.removeFile(temporalPath(win.id))
+const removeTemporalFile = id => {
+	return fs.removeFile(temporalPath(id))
 }
 
 // OPEN get path to the file-to-open
@@ -116,6 +117,11 @@ const genericSaveOrSaveAs = (win, type, ext) => {
 	
 	const translate = localize || id
 	
+	const windowManager = require("./windowManager")
+	
+	const doc = windowManager.getWindowDocument(win)
+	const guid = R.view(guidLens, doc)
+	
 	return getFilepathAndContent(win)
 		.chain(results => {
 			if (type === "save-as" || blankString(results.filePath)) {
@@ -148,7 +154,7 @@ const genericSaveOrSaveAs = (win, type, ext) => {
 							})
 						})
 					})
-					.chain(filePath => removeTemporalFile(win).map(x => filePath))
+					.chain(filePath => removeTemporalFile(guid).map(x => filePath))
 					.map(filePath => { return { filePath: filePath, content: results.content }})
 			}
 			else {
@@ -158,7 +164,6 @@ const genericSaveOrSaveAs = (win, type, ext) => {
 		.chain(results => fs.writeFile(results.filePath, results.content))
 		.map(res => res.path)
 		.chain(path => {
-			const doc = recentDocument(win, path)
 			return updateCurrentDoc(doc).map(x => path)
 		})
 }
@@ -235,6 +240,8 @@ const cleanup = win => {
 
 const closeWindow = (appIsQuitting, win, ext, performClose, closeCancelled) => {
 	
+	console.log("Close window")
+	
 	const closeAndCleanup = () => {
 		cleanup(win)
 		performClose()
@@ -247,8 +254,22 @@ const closeWindow = (appIsQuitting, win, ext, performClose, closeCancelled) => {
 				// If has path and no changes, just close it, otherwise save it in a temporal path
 				fs.createDir(baseTemporalPath())
 					.chain(base => {
-						console.log("writing file to " + temporalPath(win.id))
-						return fs.writeFile(temporalPath(win.id), results.content)				
+						
+						console.log("Created temporal path")
+						
+						const windowManager = require("./windowManager")
+
+						return R.pipe(
+							windowManager.getWindowDocument,
+							R.view(guidLens),
+							R.tap(console.log),
+							temporalPath,
+							R.tap(console.log),
+							R.curry(fs.writeFile)(R.__, results.content)
+						)(win)
+						
+						// console.log("writing file to " + path)
+						// return fs.writeFile(path, results.content)
 					})
 					.fork(closeCancelled, res => {
 						console.log("closing")

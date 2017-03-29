@@ -4,13 +4,16 @@ const BrowserWindow = electron.BrowserWindow
 const Menu = electron.Menu
 const _ = require("lodash")
 const nodePath = require("path")
-
+const { cleanRecentDocs } = require("./recentDocs")
+const R = require("ramda")
 
 function getMenuTemplate(options) {
 	
 	const separator = { type: "separator" }
-		
-	const recentDocs = _.uniqBy(_.filter(options.recentDocs || [], doc => typeof doc === "object" && doc.filePath.length > 0), "filePath")
+	
+	const recentDocs = cleanRecentDocs(options.recentDocs)
+	console.log("recentDocs: " + JSON.stringify(recentDocs))
+	// _.uniqBy(_.filter(options.recentDocs || [], doc => typeof doc === "object" && doc.filePath.length > 0), "filePath")
 	
 	const recentDocsSubmenu = _.map(recentDocs, doc => {
 		return {
@@ -277,7 +280,7 @@ function setMenu(options) {
 	globalOptions = _.extend(globalOptions, options) //overwrite with later args
 	let template = getMenuTemplate(globalOptions)
 
-	const processMenu = (options.processMenu === undefined || options.processMenu === null) ? id : options.processMenu
+	const processMenu = R.defaultTo(id, options.processMenu)
 
 	let menu = Menu.buildFromTemplate(processMenu(template))
 	Menu.setApplicationMenu(menu)

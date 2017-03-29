@@ -131,7 +131,7 @@ let initialize = function(options) {
 	fileManager.setCompareDocument(options.documentChanged)
 	
 	app.on("activate", function () {
-		if (windowManager.getWindowContainers().length === 0) windowManager.createWindow(_.extend({ docExtension: ext }, windowOptions))
+		if (windowManager.getWindowDocuments().length === 0) windowManager.createWindow(_.extend({ docExtension: ext }, windowOptions))
 		runTask(updateMenu())
 	})
 	

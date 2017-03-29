@@ -1,8 +1,8 @@
 "use strict"
+
 const _ = require("lodash")
 const Task = require("data.task")
 const R = require("ramda")
-
 const electron = require("electron")
 const app = electron.app
 
@@ -10,9 +10,12 @@ const fs = require("fs")
 
 const { preferences } = require("./preferences")
 const { blankString } = require("./utils")
+const { Doc, winLens } = require("./document")
 
 const recentFilesKey = "document_recentFiles"
 const currentFilesKey = "document_currentFiles"
+
+const filePathLens = R.lensProp("filePath")
 
 const clearRecentDocs = () => {
 	
@@ -31,7 +34,8 @@ const clearRecentDocs = () => {
 	
 }
 
-const requireFilePath = items => _.filter(items || [], doc => typeof doc === "object" && typeof doc.filePath === "string" && doc.filePath.length > 0)
+const requireArray = items => R.is(Array, items) ? items : []
+const requireFilePath = items => R.filter(doc => doc && R.is(Object, doc) && R.is(String, doc.filePath) && doc.filePath.length > 0, items)
 
 const uniqueFilePath = R.pipe(
 						R.uniqBy(item => item.filePath),
@@ -56,16 +60,21 @@ const uniqueId = R.pipe(
 const removeNotExisting = R.filter(doc => R.is(String, doc.filePath) && fs.exists(doc.filePath))
 
 const cleanRecentDocs = R.pipe(
+							requireArray,
+							R.reject(R.isNil),
 							requireFilePath,
 							uniqueFilePath,
-							removeNotExisting
+							removeNotExisting,
+							R.map(R.set(winLens, null))
 						)
 
 const cleanCurrentDocs = R.pipe(
+		requireArray,
 		R.reject(R.isNil),
 		uniqueFilePath,
 		requireId,
-		uniqueId
+		uniqueId,
+		R.map(R.set(winLens, null))
 	)
 
 const loadRecentDocs = () => {
@@ -106,8 +115,8 @@ const addRecentDoc = (doc) => {
 	catch(err) {
 		require("util").inspect(doc)
 	}
-	
-	const path = _.get(doc, "filePath", null)
+
+	const path = R.view(filePathLens, doc)
 	if (path) app.addRecentDocument(path)
 	
 	return loadRecentDocs()
@@ -132,11 +141,10 @@ const loadCurrentDocs = () => {
 	.map(cleanCurrentDocs)
 }
 
-const saveCurrentDocs = (docs) => {
-	console.log("save current docs " + JSON.stringify(docs))
-	
+const saveCurrentDocs = (docs) => {	
 	return Task.of(cleanCurrentDocs(docs))
-				.chain(docs => {
+				.chain(docs => {				
+					console.log("save current docs " + JSON.stringify(docs))
 					return new Task((reject, resolve) => {
 						preferences.set(currentFilesKey, docs, err => {
 							if (err) {
@@ -183,30 +191,15 @@ const checkRecentDocument = path => {
 		.chain(saveCurrentDocs)
 }
 
-const recentDocumentForWin = win => {
-	return {
-			id: win.id,
-			x: win.getBounds().x,
-			y: win.getBounds().y,
-			width: win.getBounds().width,
-			height: win.getBounds().height
-	}
-}
-
-const recentDocumentForPath = path => {
-	return {
-		filePath: path
-	}
-}
-
 const recentDocument = (win, path) => {
-	return Object.assign(recentDocumentForWin(win), recentDocumentForPath(path))
+	return Doc(win, path)
 }
 
 module.exports = {
 	loadRecentDocs,
 	saveRecentDocs,
 	addRecentDoc,
+	cleanRecentDocs,
 	clearRecentDocs,
 	loadCurrentDocs,
 	saveCurrentDocs,

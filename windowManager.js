@@ -14,15 +14,9 @@ const Task = require("data.task")
 const fileManager = require("./fileManager")
 const { addRecentDoc, loadCurrentDocs, saveCurrentDocs, updateCurrentDoc, recentDocument } = require("./recentDocs")
 
-const Container = (win, path) => {
-	return {
-		window: win,
-		id: win.id,
-		filePath: path
-	}
-}
+const { Doc, guidLens, filePathLens } = require("./document")
 
-let containers = []
+let documents = []
 let untitledIndex = 1
 let indexFile
 let openDevTools
@@ -30,19 +24,32 @@ let appIsQuitting = false
 
 let focusUpdateHandler = null
 
+const getWindowDocument = (win) => {
+	if (R.isNil(win)) {
+		return null
+	}
+		
+	return R.find(R.propEq("id", win.id), documents)
+}
+
 function createWindow(options) {
 	options = options || {}
 		
 	const ext = options.docExtension || ".onemodel"
+	
+	const path = R.view(filePathLens, options)
 
 	//pick a title (set as BrowserWindow.title and send with set-title)
-	let title = options.filePath ? windowTitle(options.filePath) : ( "Untitled " + untitledIndex++ )
+	const title = path ? windowTitle(path) : ( "Untitled " + untitledIndex++ )
+
+	const guid = R.view(guidLens, options)
 
 	let parameters = {
 		x: _.defaultTo(options.x, null),
 		y: _.defaultTo(options.y, null),
 		width: _.defaultTo(options.width, 900),
 		height: _.defaultTo(options.height, 600),
+		guid: guid,
 		title: title
 	}
 
@@ -71,27 +78,25 @@ function createWindow(options) {
 	const minHeight = options.minHeight || 50
 	win.setMinimumSize(minWidth, minHeight)
 	
-	const container = Container(win, options.filePath, options.tmpPath)
-	containers.push(container)
+	const container = Doc(win, path, guid)
+	documents.push(container)
 
 	// and load the index.html of the app.
 	win.loadURL(indexFile)
 
 	win.webContents.on("did-finish-load", function() {
-		setUpWindow(win, options.filePath, options.fileContent)
+		setUpWindow(win, path, options.fileContent)
 	})
-	
-	const filePath = options.filePath
 
 	win.on("close", function(e) {
-		console.log("close " + win.id + " " + filePath)
+		console.log("close " + win.id + " " + path)
 		e.preventDefault()
 		
 		// Ask the user if the doc file is not up to date
 		fileManager.close(appIsQuitting, win, ext, filePath => {
 			console.log("perform close " + win.id)
 		
-			const doc = recentDocument(win, filePath)
+			const doc = getWindowDocument(win)
 			addRecentDoc(doc)
 				.chain(updateCurrentDoc)
 				.fork(console.error, console.log)
@@ -100,14 +105,14 @@ function createWindow(options) {
 				runTask(updateCurrentDoc(doc))
 			}
 		
-			containers = _.filter(containers, container => container.id !== win.id)
+			documents = _.filter(documents, container => container.id !== win.id)
 			if (win) {
 				win.hide()
 				win.destroy()
 				win = null
 			}
 		
-			if (appIsQuitting && containers.length == 0) {
+			if (appIsQuitting && documents.length == 0) {
 				console.log("Try quitting again")
 				app.quit()
 			}
@@ -122,9 +127,9 @@ function createWindow(options) {
 	})
 	
 // 	win.on("closed", function() {
-// 		containers = _.filter(containers, container => container.id !== winId)
+// 		documents = _.filter(documents, container => container.id !== winId)
 //
-// 		// if (appIsQuitting && containers.length == 0) {
+// 		// if (appIsQuitting && documents.length == 0) {
 // // 			app.exit(0)
 // // 		}
 // 	})
@@ -148,17 +153,21 @@ function createWindow(options) {
 const createDocumentWindow = (properties, ext) => {
     //not open, do the rest of the stuff
 	const focused = BrowserWindow.getFocusedWindow()
+
+	const guid = R.view(guidLens, properties)
+	const filePath = R.view(filePathLens, properties)
 	
-	const isTemporal = blankString(properties.filePath) // || isBasePath(baseTemporalPath, properties.filePath)
+	const isTemporal = blankString(filePath) // || isBasePath(baseTemporalPath, properties.filePath)
 	console.log("isTemporal: " + JSON.stringify(isTemporal))
 	
-	const path = isTemporal ? temporalPath(properties.id) : properties.filePath
+	const path = isTemporal ? temporalPath(guid) : filePath
 	
 	const createWin = (path, contents) => {
 		return new Task((reject, resolve) => {
 			
 			const options = {
 				focusedWindow: focused,
+				guid: guid,
 				filePath: isTemporal ? null : path,
 				fileContent: contents,
 				x: properties.x,
@@ -199,7 +208,7 @@ function setUpWindow(win, filePath, contents) {
 	console.log("setupWindow")
 	
 	if (filePath) {
-		containers = _.map(containers, c => {
+		documents = _.map(documents, c => {
 			if (c.window.id === win.id) {
 				c.path = filePath
 			}
@@ -223,8 +232,7 @@ const loadWindows = (ext, options) => {
 		.map(R.reverse)
 		.fork(console.error, docs => {	
 			console.log("loaded current docs")
-			const recents = _.filter(docs, recent => typeof recent === "object")
-			Immutable.fromJS(recents)
+			Immutable.fromJS(docs)
 				.map(prop => prop.toJS())
 				.traverse(Task.of, prop => createDocumentWindow(_.extend(prop, options), ext))
 				.fork(console.error, results => {
@@ -237,17 +245,8 @@ const loadWindows = (ext, options) => {
 		})
 }
 
-const loadProperties = () => {
-	const results = _.map(containers, c => {
-		return recentDocument(c.window, c.filePath)		
-	})
-	
-	return Task.of(results)
-}
-
 const saveWindows = () => {
-	loadProperties()
-		.chain(saveCurrentDocs)
+	saveCurrentDocs(documents)
 		.fork(console.error, console.log)
 }
 
@@ -268,17 +267,13 @@ module.exports = {
 	windowCloseCancelled: () => {
 		appIsQuitting = false
 	},
-	getWindowContainers: function() { return containers },
-	getWindows: function() { return _.map(containers, c => c.window) },
+	getWindowDocuments: function() { return documents },
+	getWindows: function() { return _.map(documents, c => c.window) },
 	setQuitting: function(isQuitting) {
 		appIsQuitting = isQuitting
 	},
-	getWindowContainer: (win) => {
-		if (win === undefined || win === null) return null
-			
-		return _.find(containers, c => c.id === win.id)
-	},
 	
+	getWindowDocument: getWindowDocument,
 	saveWindows: saveWindows,
 	loadWindows: loadWindows
 }

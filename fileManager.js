@@ -13,11 +13,11 @@ const ipcHelper = require("./ipcHelper")
 const { windowTitle, id, blankString, baseTemporalPath, temporalPath } = require("./utils")
 const dialogTasks = require("./dialogTasks")
 const { updateCurrentDoc } = require("./recentDocs")
-const { guidLens } = require("./document")
+const { guidLens, filePathLens } = require("./document")
 const documentManager = require("./documentManager")
+const { addRecentDoc } = require("./recentDocs")
 
 let fs = require("./fileTasks")
-
 
 let writingFiles = {}
 
@@ -162,6 +162,9 @@ const genericSaveOrSaveAs = (win, type, ext) => {
 						})
 					})
 					.chain(filePath => removeTemporalFile(guid).map(x => filePath))
+					.map(filePath => R.set(filePathLens, filePath, doc))
+					.chain(doc => addRecentDoc(doc))
+					.map(R.view(filePathLens))
 					.map(filePath => { return { filePath: filePath, content: results.content }})
 			}
 			else {
@@ -316,14 +319,11 @@ const resolveClose = (win, edited, ext, content, performClose, closeCancelled) =
 		})
 	}
 	
-	console.log("resolve close. Edited " + edited)
-	
 	const translate = localize || id	
 	
 	const saveTask = genericSaveOrSaveAs(win, "save", ext).chain(performCloseTask)
 	
 	if(!edited && content === "") {
-		// BrowserWindow.getFocusedWindow().close()
 		performClose()
 		
 	} else if(!edited && content !== "") { // See if we really need to save here
@@ -337,8 +337,8 @@ const resolveClose = (win, edited, ext, content, performClose, closeCancelled) =
 		
 		dialogTasks.ask(translate("Your file was changed since saving the last time. Do you want to save before closing?"),
 			[
-				{ name: translate("Save changes"), task: saveTask },
-				{ name: translate("Discard changes"), task: discardWindowDocument(win).chain(performCloseTask) },
+				{ name: translate("Save Changes"), task: saveTask },
+				{ name: translate("Discard Changes"), task: discardWindowDocument(win).chain(performCloseTask) },
 				{ name: translate("Cancel"), task: Task.of("cancelled").map(x => {
 					closeCancelled()
 					return x
@@ -350,24 +350,6 @@ const resolveClose = (win, edited, ext, content, performClose, closeCancelled) =
 				// console.log("// closing after user decided")
 			})
 	}		
-
-		// if (button === 0) { //SAVE
-// 			genericSaveOrSaveAs(win, "save", ext)
-// 				.fork(err => {
-// 					console.error("Can't close window: Error saving. " + err)
-// 				}, res => {
-// 					console.log("closing after saved")
-// 					performClose()
-// 				})
-// 		} else if (button === 1) { //DISCARD
-// 			console.log("Discard save")
-// 			performClose(null)
-// 		} else {
-// 			//CANCEL - do nothing
-// 			console.log("cancel close")
-// 			closeCancelled()
-// 		}
-//	 }
 }
 
 module.exports = {

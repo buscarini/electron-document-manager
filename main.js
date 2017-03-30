@@ -139,7 +139,7 @@ let initialize = function(options) {
 		windowManager.setQuitting(true)
 	})
 	
-	app.on("browser-window-blur", runTaskF(updateMenu()))
+	app.on("browser-window-blur", runTaskF(updateMenu().chain(windowManager.saveWindowsTask)))
 	app.on("browser-window-focus", runTaskF(updateMenu()))
 	
 	// Quit when all windows are closed.
@@ -166,9 +166,6 @@ let initialize = function(options) {
 		//set up menu
 		createMenuOptions(userMenuOptions).fork(console.error, menuManager.setMenu)
 		
-		//set up window menu updates - to be run on focus, blur, and window create
-		windowManager.setFocusUpdateHandler(() => updateMenu())
-
 		// Restore windows
 		windowManager.loadWindows(ext, windowOptions)
 	})

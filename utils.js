@@ -5,6 +5,7 @@ const Task = require("data.task")
 const R = require("ramda")
 const { Conjunction, mconcat } = require("fantasy-monoids")
 
+const { filePathLens } = require("./document")
 
 const removeExt = filePath => filePath.substr(0, filePath.lastIndexOf("."))
 const windowTitle = filePath => removeExt(path.basename(filePath))
@@ -43,6 +44,12 @@ const temporalPath = id => path.join(baseTemporalPath(), id.toString())
 const emptyString = string => string === null || string === undefined || string.length === 0
 const blankString = string => (R.is(String, string) && emptyString(R.trim(string))) || emptyString(string)
 
+const isTemporal = doc => R.pipe(
+					R.view(filePathLens),
+					blankString
+				)
+
+
 module.exports = {
 	removeExt,
 	windowTitle,
@@ -56,6 +63,7 @@ module.exports = {
 	
 	checkNotNull,
 	emptyString,
-	blankString
+	blankString,
+	isTemporal
 }
 

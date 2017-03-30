@@ -43,7 +43,7 @@ const readFile = path => {
 	})
 }
 
-const writeFile = (path, content) => {
+const writeFile = content => path => {
 	return new Task((reject, resolve) => {
 		if (!pathIsValid(path)) {
 			reject("no file Path")

@@ -8,12 +8,13 @@ const path = require("path")
 const chokidar = require("chokidar")
 let nodeFs = require("fs")
 const Task = require("data.task")
+const Immutable = require("immutable-ext")
 
 const ipcHelper = require("./ipcHelper")
-const { windowTitle, id, blankString, baseTemporalPath, temporalPath } = require("./utils")
+const { windowTitle, id, blankString, baseTemporalPath, temporalPath, isTemporal } = require("./utils")
 const dialogTasks = require("./dialogTasks")
 const { updateCurrentDoc } = require("./recentDocs")
-const { guidLens, filePathLens } = require("./document")
+const { guidLens, filePathLens, winLens } = require("./document")
 const documentManager = require("./documentManager")
 const { addRecentDoc } = require("./recentDocs")
 
@@ -59,6 +60,8 @@ const tellRenderer = property => value => win => {
 const getFilepathAndContent = askRenderer("filepath_content")
 const isWinDocumentEdited = askRenderer("is_edited")
 const setWinDocumentEdited = tellRenderer("set_edited")
+
+const getContent = win => getFilepathAndContent(win).map(results => results.content)
 
 const removeTemporalFile = id => {
 	return fs.removeFile(temporalPath(id))
@@ -171,7 +174,7 @@ const genericSaveOrSaveAs = (win, type, ext) => {
 				return Task.of(results)
 			}
 		})
-		.chain(results => fs.writeFile(results.filePath, results.content))
+		.chain(results => fs.writeFile(results.content)(results.filePath))
 		.map(res => res.path)
 		.chain(path => {
 			return updateCurrentDoc(doc).map(x => path)
@@ -239,13 +242,29 @@ const silentSaveTask = (win) => {
 			return results
 		})
 		.chain(results => {
-			return fs.writeFile(results.filePath, results.content)
+			return fs.writeFile(results.content)(results.filePath)
 		})
 		.chain(x => setWinDocumentEdited(false)(win).map(result => x))
 }
 
 const cleanup = win => {
 	if (win.watcher) { win.watcher.close() }
+}
+
+const saveTemporalDocument = doc => {
+	const pathTask = fs.createDir(baseTemporalPath())
+						.map(path => R.view(guidLens, doc))
+						.map(temporalPath)
+						
+	const win = R.view(winLens, doc)
+	
+	return (
+			Task.of(fs.writeFile)
+				.ap(getContent(win))
+				.ap(pathTask)
+			)
+			.chain(t => t)
+			.map(path => doc)
 }
 
 const closeWindow = (appIsQuitting, win, ext, performClose, closeCancelled) => {
@@ -262,23 +281,33 @@ const closeWindow = (appIsQuitting, win, ext, performClose, closeCancelled) => {
 			
 			if (appIsQuitting && blankString(results.filePath)) {
 				// If has path and no changes, just close it, otherwise save it in a temporal path
-				fs.createDir(baseTemporalPath())
-					.chain(base => {
-						return R.pipe(
-							documentManager.getWindowDocument,
-							R.view(guidLens),
-							temporalPath,
-							R.tap(console.log),
-							R.curry(fs.writeFile)(R.__, results.content)
-						)(win)
-						
-						// console.log("writing file to " + path)
-						// return fs.writeFile(path, results.content)
-					})
-					.fork(closeCancelled, res => {
+				const saveTask = R.pipe(
+					documentManager.getWindowDocument,
+					saveTemporalDocument
+				)(win)
+				
+				saveTask.fork(closeCancelled, res => {
 						console.log("closing")
 						closeAndCleanup()
 					})
+								
+				// fs.createDir(baseTemporalPath())
+// 					.chain(base => {
+// 						return R.pipe(
+// 							documentManager.getWindowDocument,
+// 							R.view(guidLens),
+// 							temporalPath,
+// 							R.tap(console.log),
+// 							fs.writeFile(results.content)
+// 						)(win)
+//
+// 						// console.log("writing file to " + path)
+// 						// return fs.writeFile(path, results.content)
+// 					})
+// 					.fork(closeCancelled, res => {
+// 						console.log("closing")
+// 						closeAndCleanup()
+// 					})
 			}
 			else if (!blankString(results.filePath)) {
 				isWinDocumentEdited(win)
@@ -349,7 +378,16 @@ const resolveClose = (win, edited, ext, content, performClose, closeCancelled) =
 			}, res => {
 				// console.log("// closing after user decided")
 			})
-	}		
+	}
+}
+
+// saveTemporalDocuments:: [Doc] -> Task [Doc]
+const saveTemporalDocuments = docs => {
+	const temporalDocs = R.filter(isTemporal, docs)
+	return Immutable.fromJS(temporalDocs)
+		.map(doc => doc.toJS())
+		.traverse(Task.of, saveTemporalDocument)
+		.map(results => results.toArray())
 }
 
 module.exports = {
@@ -366,5 +404,6 @@ module.exports = {
 	setCompareDocument: (docChanged) => {
 		documentChanged = docChanged
 	},
-	windowPathChanged: windowPathChanged
+	windowPathChanged: windowPathChanged,
+	saveTemporalDocuments: saveTemporalDocuments
 }

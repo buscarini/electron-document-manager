@@ -12,8 +12,6 @@ function getMenuTemplate(options) {
 	const separator = { type: "separator" }
 	
 	const recentDocs = cleanRecentDocs(options.recentDocs)
-	console.log("recentDocs: " + JSON.stringify(recentDocs))
-	// _.uniqBy(_.filter(options.recentDocs || [], doc => typeof doc === "object" && doc.filePath.length > 0), "filePath")
 	
 	const recentDocsSubmenu = _.map(recentDocs, doc => {
 		return {

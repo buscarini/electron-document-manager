@@ -245,17 +245,21 @@ const loadWindows = (ext, options) => {
 		})
 }
 
-const saveWindows = () => {
-	saveCurrentDocs(documentManager.getDocuments())
-		.fork(console.error, console.log)
+const saveWindowsTask = () => {
+	return fileManager.saveTemporalDocuments(documentManager.getDocuments())
+		.map(R.tap(console.log))
+		.chain(saveCurrentDocs)
 }
 
+const saveWindows = () => {
+	saveWindowsTask().fork(console.error, console.log)
+}
 
 module.exports = {
-	createWindow: createWindow,
-	createDocumentWindow: createDocumentWindow,
+	createWindow,
+	createDocumentWindow,
+	setUpWindow,
 	
-	setUpWindow: setUpWindow,
 	//note: focus and blur handlers will only apply to future windows at creation
 	setFocusUpdateHandler: function(func) {
 		focusUpdateHandler = func
@@ -270,9 +274,12 @@ module.exports = {
 	setQuitting: function(isQuitting) {
 		appIsQuitting = isQuitting
 	},
+	
 	getWindowDocuments: documentManager.getDocuments,
 	getWindows: documentManager.getWindows,
 	getWindowDocument: documentManager.getWindowDocument,
-	saveWindows: saveWindows,
-	loadWindows: loadWindows
+	
+	saveWindowsTask,
+	saveWindows,
+	loadWindows
 }

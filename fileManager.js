@@ -11,7 +11,7 @@ const Task = require("data.task")
 const Immutable = require("immutable-ext")
 
 const ipcHelper = require("./ipcHelper")
-const { windowTitle, id, blankString, baseTemporalPath, temporalPath, isTemporal } = require("./utils")
+const { windowTitle, id, blankString, baseTemporalPath, temporalPath } = require("./utils")
 const dialogTasks = require("./dialogTasks")
 const { updateCurrentDoc } = require("./recentDocs")
 const { guidLens, filePathLens, winLens } = require("./document")
@@ -44,6 +44,7 @@ function hasChanges(filePath, content, completion) {
 const askRenderer = property => win => {
 	return new Task((reject, resolve) => {
 		ipcHelper.requestFromRenderer(win, property, (event, results) => {
+			console.log("resolve ask renderer " + property)
 			resolve(results)
 		})
 	})
@@ -131,15 +132,20 @@ const genericSaveOrSaveAs = (win, type, ext) => {
 	
 	const doc = documentManager.getWindowDocument(win)
 	const guid = R.view(guidLens, doc)
-	
+
+	console.log("genericSaveOrSaveAs")
+		
 	return getFilepathAndContent(win)
 		.chain(results => {
+			
+			console.log("EEOAFKSDOASDOFKASDFKA")
+			// console.log("RESULTS: " + JSON.stringify(results))
+			
 			if (type === "save-as" || blankString(results.filePath)) {
 				return dialogTasks.saveDialog([
 						{name: "OneModel", extensions: ["onemodel"]},
 						{name: translate("All Files"), extensions: ["*"]}
 					])
-					.map(R.tap(console.log))
 					.chain(filePath => blankString(filePath) ? Task.empty() : Task.of(filePath))
 					.map(filePath => {
 						if (path.extname(filePath).length == 0 && ext.length > 0) {
@@ -177,6 +183,7 @@ const genericSaveOrSaveAs = (win, type, ext) => {
 		.chain(results => fs.writeFile(results.content)(results.filePath))
 		.map(res => res.path)
 		.chain(path => {
+			console.log("genericSaveOrSaveAs -> before update current doc (after save)")
 			return updateCurrentDoc(doc).map(x => path)
 		})
 }
@@ -383,8 +390,7 @@ const resolveClose = (win, edited, ext, content, performClose, closeCancelled) =
 
 // saveTemporalDocuments:: [Doc] -> Task [Doc]
 const saveTemporalDocuments = docs => {
-	const temporalDocs = R.filter(isTemporal, docs)
-	return Immutable.fromJS(temporalDocs)
+	return Immutable.fromJS(docs)
 		.map(doc => doc.toJS())
 		.traverse(Task.of, saveTemporalDocument)
 		.map(results => results.toArray())

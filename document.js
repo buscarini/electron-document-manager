@@ -8,6 +8,11 @@ const idLens = R.lensProp("id")
 const guidLens = R.lensProp("guid")
 const filePathLens = R.lensProp("filePath")
 
+const xLens = R.lensProp("x")
+const yLens = R.lensProp("y")
+const widthLens = R.lensProp("widthLens")
+const heightLens = R.lensProp("height")
+
 const Doc = (win, path, guid) => {
 	
 	const defaultBounds = { x: 0, y: 0, width: 800, height: 600 }
@@ -33,5 +38,10 @@ module.exports = {
 	winLens,
 	idLens,
 	guidLens,
-	filePathLens
+	filePathLens,
+
+	xLens,
+	yLens,
+	widthLens,
+	heightLens
 }

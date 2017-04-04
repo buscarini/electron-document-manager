@@ -4,6 +4,7 @@ const electron = require("electron")
 const app = electron.app	// Module to control application life.
 const BrowserWindow = electron.BrowserWindow
 const _ = require("lodash")
+const Task = require("data.task")
 
 const menuManager = require("./menuManager")
 const fileManager = require("./fileManager")
@@ -84,16 +85,22 @@ const createMenuOptions = (options) => {
 							console.log("SAVE")
 							fileManager.saveFile(ext, (err, path) => {
 								if (!err) {
-							focusedWindow.webContents.send("document_saved", path)
-
-							runTask(addRecentDocument({filePath: path}))
+									focusedWindow.webContents.send("document_saved", path)
+									runTask(addRecentDocument({filePath: path}))
+									windowManager.saveWindows()
 								}
 							})
 					windowManager.saveWindows()
 						},
 						saveAsMethod: function(item, focusedWindow) {
-							fileManager.saveFileAs(ext)
-					windowManager.saveWindows()
+							fileManager.saveFileAs(ext, (err, path) => {
+								if (!err) {
+									focusedWindow.webContents.send("document_saved", path)
+									runTask(addRecentDocument({filePath: path}))
+									windowManager.saveWindows()
+								}
+							})
+							
 						},
 						renameMethod: function(item, focusedWindow) {
 							//fileManager.renameFile()
@@ -139,7 +146,11 @@ let initialize = function(options) {
 		windowManager.setQuitting(true)
 	})
 	
-	app.on("browser-window-blur", runTaskF(updateMenu().chain(windowManager.saveWindowsTask)))
+	app.on("browser-window-blur", runTaskF(updateMenu()
+											.chain(docs => windowManager.isQuitting() ? Task.empty() : Task.of(docs))
+											.chain(windowManager.saveWindowsTask)
+									)
+		)
 	app.on("browser-window-focus", runTaskF(updateMenu()))
 	
 	// Quit when all windows are closed.

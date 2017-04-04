@@ -3,7 +3,6 @@
 const electron = require("electron")
 const ipcRenderer = electron.ipcRenderer
 const BrowserWindow = electron.remote.BrowserWindow
-const { blankString } = require("./utils")
 
 const requestId = name => "request-" + name
 
@@ -14,10 +13,13 @@ let filePath = null,
 	isEdited = false
 
 const updateEdited = edited => {
-	isEdited = blankString(filePath) ? true : edited
+	// FIXME: We also need to check if the state is empty
+	isEdited = edited //blankString(filePath) ? true : edited
 	
 	const win = BrowserWindow.getFocusedWindow() || electron.remote.getCurrentWindow()
 	if (win) {
+		console.log("setting document edited to")
+		console.log(isEdited)
 		win.setDocumentEdited(isEdited)
 	}
 }
@@ -63,6 +65,9 @@ ipcRenderer.on(requestId("is_edited"), function(event, callbackChannel) {
 })
 
 ipcRenderer.on("set_edited", function(event, edited, callbackChannel) {
+	console.log("set edited to: ")
+	console.log(edited)
+	
 	updateEdited(edited)
 	if(callbackChannel) ipcRenderer.send(callbackChannel)
 })

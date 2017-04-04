@@ -12,8 +12,8 @@ function requestFromRenderer(win, variable, callback) {
 	// FIXME: If multiple requests are made to multiple windows, only the last one will be received and they will be mangled -> Pass the win id, and check in the callback against the window id -> Seems fixed, but we need to check
 
 	//remove all listeners, because otherwise we"ll start calling old callbacks
-	ipcMain.removeAllListeners(id)
-	ipcMain.on(id, callback)
+	// ipcMain.removeAllListeners(id)
+	ipcMain.once(id, callback)
 }
 
 module.exports = {

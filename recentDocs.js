@@ -142,6 +142,9 @@ const loadCurrentDocs = () => {
 }
 
 const saveCurrentDocs = (docs) => {	
+	
+	console.log("save current docs " + JSON.stringify(R.map(R.set(winLens, null), docs)))
+	
 	return Task.of(cleanCurrentDocs(docs))
 				.chain(docs => {				
 					console.log("save current docs " + JSON.stringify(docs))

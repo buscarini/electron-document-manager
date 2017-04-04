@@ -8,7 +8,7 @@ let documents = []
 
 const getDocuments = () => documents
 
-const getWindows = R.map(R.view(winLens), documents)
+const getWindows = () => R.map(R.view(winLens), documents)
 
 const getDocument = (id) => {
 	return R.find(R.propEq("id", id), documents)

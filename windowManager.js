@@ -14,7 +14,7 @@ const Task = require("data.task")
 const fileManager = require("./fileManager")
 const { addRecentDoc, loadCurrentDocs, saveCurrentDocs, updateCurrentDoc, recentDocument } = require("./recentDocs")
 
-const { Doc, guidLens, filePathLens } = require("./document")
+const { Doc, guidLens, winLens, filePathLens, xLens, yLens, widthLens, heightLens } = require("./document")
 const documentManager = require("./documentManager")
 
 // let documents = []
@@ -221,7 +221,7 @@ function setUpWindow(win, filePath, contents) {
 		win.setTitle(windowTitle(filePath))
 	}
 	
-	if(contents) {
+	if (!blankString(contents)) {
 		win.webContents.send("set-content", contents)
 	}
 }
@@ -245,10 +245,25 @@ const loadWindows = (ext, options) => {
 		})
 }
 
+const updateFrame = doc => {
+	const win = R.view(winLens, doc)
+	
+	const bounds = win.getBounds()
+	
+	return R.pipe(
+		R.set(xLens, R.view(xLens, bounds)),
+		R.set(yLens, R.view(yLens, bounds)),
+		R.set(widthLens, R.view(widthLens, bounds)),
+		R.set(heightLens, R.view(heightLens, bounds))
+	)(doc)	
+} 
+
 const saveWindowsTask = () => {
-	return fileManager.saveTemporalDocuments(documentManager.getDocuments())
-		.map(R.tap(console.log))
-		.chain(saveCurrentDocs)
+	return Task.of(documentManager.getDocuments())
+				.map(R.map(updateFrame))
+				.chain(fileManager.saveTemporalDocuments)
+				.map(R.tap(console.log))
+				.chain(saveCurrentDocs)
 }
 
 const saveWindows = () => {
@@ -271,9 +286,9 @@ module.exports = {
 	windowCloseCancelled: () => {
 		appIsQuitting = false
 	},
-	setQuitting: function(isQuitting) {
-		appIsQuitting = isQuitting
-	},
+
+	setQuitting: isQuitting => { appIsQuitting = isQuitting },
+	isQuitting: () => appIsQuitting,
 	
 	getWindowDocuments: documentManager.getDocuments,
 	getWindows: documentManager.getWindows,

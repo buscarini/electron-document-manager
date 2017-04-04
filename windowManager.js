@@ -55,8 +55,6 @@ function createWindow(options) {
 	}
 
 	parameters = _.extend(parameters, { show: false })
-
-	console.log("DO CREATE THE WINDOW")
 	
 	// Create the browser window.
 	let win = null
@@ -83,23 +81,14 @@ function createWindow(options) {
 	})
 
 	win.on("close", function(e) {
-		console.log("close " + win.id + " " + path)
 		e.preventDefault()
 		
 		// Ask the user if the doc file is not up to date
-		fileManager.close(appIsQuitting, win, ext, filePath => {
-			console.log("perform close " + win.id)
-		
+		fileManager.close(appIsQuitting, win, ext, filePath => {		
 			const doc = documentManager.getWindowDocument(win)
 			runTask(addRecentDoc(doc)
 				.chain(updateCurrentDoc))
-		
-			// if (appIsQuitting) {
-// 				runTask(updateCurrentDoc(doc))
-// 			}
-	
-			console.log("docs: " + JSON.stringify(documentManager.getDocuments().length))
-		
+				
 			documentManager.removeDocument(win.id)
 			// documents = _.filter(documents, container => container.id !== win.id)
 			if (win) {
@@ -107,8 +96,6 @@ function createWindow(options) {
 				win.destroy()
 				win = null
 			}
-		
-			console.log("docs: " + JSON.stringify(documentManager.getDocuments().length))
 		
 			if (appIsQuitting && documentManager.getDocuments().length == 0) {
 				console.log("Try quitting again")
@@ -155,8 +142,7 @@ const createDocumentWindow = (properties, ext) => {
 	const guid = R.view(guidLens, properties)
 	const filePath = R.view(filePathLens, properties)
 	
-	const isTemporal = blankString(filePath) // || isBasePath(baseTemporalPath, properties.filePath)
-	console.log("isTemporal: " + JSON.stringify(isTemporal))
+	const isTemporal = blankString(filePath)
 	
 	const path = isTemporal ? temporalPath(guid) : filePath
 	
@@ -182,8 +168,6 @@ const createDocumentWindow = (properties, ext) => {
 			resolve(newWin)
 		})
 	}
-	
-	console.log("created window for doc " + path)
 		
 	return Task.of(path)
 			.chain(fs.readFile)
@@ -191,8 +175,6 @@ const createDocumentWindow = (properties, ext) => {
 			.orElse(x => Task.of(createWin(null, "")))
 			.chain(win => {
 				saveWindows()
-		
-				console.log("Before add recent doc. Path: " + path)
 		
 				if (R.is(String, path) && !isTemporal) {
 					return addRecentDoc(recentDocument(win, path))
@@ -203,8 +185,6 @@ const createDocumentWindow = (properties, ext) => {
 }
 
 function setUpWindow(win, filePath, contents) {
-	console.log("setupWindow")
-	
 	if (filePath) {
 		documentManager.updateDocumentPath(win.id, filePath)
 		
@@ -227,16 +207,13 @@ function setUpWindow(win, filePath, contents) {
 }
 
 const loadWindows = (ext, options) => {
-	console.log("load windows")
 	loadCurrentDocs()
 		.map(R.reverse)
 		.fork(console.error, docs => {	
-			console.log("loaded current docs")
 			Immutable.fromJS(docs)
 				.map(prop => prop.toJS())
 				.traverse(Task.of, prop => createDocumentWindow(_.extend(prop, options), ext))
 				.fork(console.error, results => {
-					console.log("create windows: " + results)
 					const windows = _.filter(results.toArray(), win => win != null)
 					if (windows.length === 0) {
 						createWindow(_.extend({ docExtension: ext }, options))
@@ -262,7 +239,6 @@ const saveWindowsTask = () => {
 	return Task.of(documentManager.getDocuments())
 				.map(R.map(updateFrame))
 				.chain(fileManager.saveTemporalDocuments)
-				.map(R.tap(console.log))
 				.chain(saveCurrentDocs)
 }
 

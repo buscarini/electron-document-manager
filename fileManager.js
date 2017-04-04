@@ -44,7 +44,6 @@ function hasChanges(filePath, content, completion) {
 const askRenderer = property => win => {
 	return new Task((reject, resolve) => {
 		ipcHelper.requestFromRenderer(win, property, (event, results) => {
-			console.log("resolve ask renderer " + property)
 			resolve(results)
 		})
 	})
@@ -93,7 +92,6 @@ function userOpensHandler(filePath) {
 // SAVE
 
 const userSavesHandler = (ext, callback) => {
-	console.log("Getting focused window")
 	const win = BrowserWindow.getFocusedWindow()
 	genericSaveOrSaveAs(win, "save", ext)
 		.fork(err => {
@@ -132,15 +130,9 @@ const genericSaveOrSaveAs = (win, type, ext) => {
 	
 	const doc = documentManager.getWindowDocument(win)
 	const guid = R.view(guidLens, doc)
-
-	console.log("genericSaveOrSaveAs")
 		
 	return getFilepathAndContent(win)
 		.chain(results => {
-			
-			console.log("EEOAFKSDOASDOFKASDFKA")
-			// console.log("RESULTS: " + JSON.stringify(results))
-			
 			if (type === "save-as" || blankString(results.filePath)) {
 				return dialogTasks.saveDialog([
 						{name: "OneModel", extensions: ["onemodel"]},
@@ -155,7 +147,6 @@ const genericSaveOrSaveAs = (win, type, ext) => {
 							return path
 						}
 					})
-					.map(R.tap(console.log))
 					.chain(filePath => fileExists(filePath) ? askOverwrite(filePath) : Task.of(filePath))
 					.chain(filePath => {
 						return new Task((reject, resolve) => {
@@ -183,7 +174,6 @@ const genericSaveOrSaveAs = (win, type, ext) => {
 		.chain(results => fs.writeFile(results.content)(results.filePath))
 		.map(res => res.path)
 		.chain(path => {
-			console.log("genericSaveOrSaveAs -> before update current doc (after save)")
 			return updateCurrentDoc(doc).map(x => path)
 		})
 }
@@ -276,8 +266,6 @@ const saveTemporalDocument = doc => {
 
 const closeWindow = (appIsQuitting, win, ext, performClose, closeCancelled) => {
 	
-	console.log("Close window")
-	
 	const closeAndCleanup = () => {
 		cleanup(win)
 		performClose()
@@ -294,38 +282,16 @@ const closeWindow = (appIsQuitting, win, ext, performClose, closeCancelled) => {
 				)(win)
 				
 				saveTask.fork(closeCancelled, res => {
-						console.log("closing")
 						closeAndCleanup()
 					})
-								
-				// fs.createDir(baseTemporalPath())
-// 					.chain(base => {
-// 						return R.pipe(
-// 							documentManager.getWindowDocument,
-// 							R.view(guidLens),
-// 							temporalPath,
-// 							R.tap(console.log),
-// 							fs.writeFile(results.content)
-// 						)(win)
-//
-// 						// console.log("writing file to " + path)
-// 						// return fs.writeFile(path, results.content)
-// 					})
-// 					.fork(closeCancelled, res => {
-// 						console.log("closing")
-// 						closeAndCleanup()
-// 					})
 			}
 			else if (!blankString(results.filePath)) {
 				isWinDocumentEdited(win)
 					.fork(console.error, edited => {
-						console.log("has filepath")
-						console.log("edited: " + JSON.stringify(edited))
 						resolveClose(win, edited, ext, results.content, closeAndCleanup, closeCancelled)	
 					})
 			}
 			else {
-					console.log("no filepath")
 					resolveClose(win, (results.content !== ""), ext, results.content, closeAndCleanup, closeCancelled)
 				}				
 			})
@@ -336,7 +302,6 @@ const discardWindowDocument = R.pipe(
 		documentManager.getWindowDocument,
 		R.view(guidLens),
 		temporalPath,
-		R.tap(console.log),
 		fs.removeFileIfExists
 	)
 

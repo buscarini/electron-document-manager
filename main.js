@@ -32,14 +32,10 @@ const addRecentDocument = (doc) => {
 		.chain(updateMenu)
 }
 
-const openDocument = windowOptions => path => {
-	console.log("Open Document")
-	
+const openDocument = windowOptions => path => {	
 	const ext = _.defaultTo(windowOptions.docExtension, "")
 	fileManager.openFile(path)
-		.fork(console.error, filePath => {			
-			console.log("Opened document")
-			
+		.fork(console.error, filePath => {						
 			//check if open in other window
 			let windows = windowManager.getWindows()
 
@@ -54,7 +50,6 @@ const openDocument = windowOptions => path => {
 			else {
 				console.log("Creating doc for opened document")
 				windowManager.createDocumentWindow(_.extend({ filePath: filePath }, windowOptions), ext, windowManager.saveWindows)
-					.map(x => { console.log(x); return x })
 					.chain(updateMenu)
 					.fork(err => {
 						checkRecentDocument(path)
@@ -65,9 +60,7 @@ const openDocument = windowOptions => path => {
 		})
 }
 
-const createMenuOptions = (options) => {
-	console.log("menuOptions")
-	
+const createMenuOptions = (options) => {	
 	const windowOptions = options.windowOptions || {}
 	
 	return loadRecentDocs()
@@ -82,7 +75,6 @@ const createMenuOptions = (options) => {
 							openDocument(windowOptions)(filePath)
 						},
 						saveMethod: function(item, focusedWindow) {
-							console.log("SAVE")
 							fileManager.saveFile(ext, (err, path) => {
 								if (!err) {
 									focusedWindow.webContents.send("document_saved", path)
@@ -166,7 +158,6 @@ let initialize = function(options) {
 	})
 	
 	app.on("open-file", function(e, filePath) {
-		console.log("open-file")
 		openDocument(windowOptions)(filePath)
 	})
 

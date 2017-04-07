@@ -34,8 +34,18 @@ const ask = (message, buttonTasks) => {
 	return showMessageBox(message, buttonTasks, "question")
 }
 
+const info = (message, buttonTasks) => {
+	return showMessageBox(message, buttonTasks, "info")
+}
+
+const error = (message, buttonTasks) => {
+	return showMessageBox(message, buttonTasks, "error")
+}
+
 module.exports = {
 	showMessageBox,
 	ask,
-	saveDialog
+	saveDialog,
+	info,
+	error
 }
